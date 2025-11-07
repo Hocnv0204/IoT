@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+ultralytics
+paddleocr
+paddlepaddle
+opencv-python
+matplotlib
+numpy
+torch
+torchvision
+onnxruntime
+dill
+python-multipart
