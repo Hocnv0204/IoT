@@ -1,12 +1,13 @@
 package com.iot.smartparking.parking_be.dto.response;
 
 import com.iot.smartparking.parking_be.exception.ErrorCode;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import org.springframework.http.HttpStatus;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ApiErrorResponse {
     private int code;
     private String message ;

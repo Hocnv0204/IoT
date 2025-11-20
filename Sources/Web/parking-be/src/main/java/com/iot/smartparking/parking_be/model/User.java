@@ -1,8 +1,7 @@
 package com.iot.smartparking.parking_be.model;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Data;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
@@ -12,6 +11,9 @@ import java.util.List;
 @Table(name="user")
 @Data
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Builder
+@RequiredArgsConstructor
+@AllArgsConstructor
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
