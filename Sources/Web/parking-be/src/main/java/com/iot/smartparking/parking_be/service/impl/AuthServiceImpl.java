@@ -1,6 +1,6 @@
 package com.iot.smartparking.parking_be.service.impl;
 
-import com.iot.smartparking.parking_be.common.ROLE;
+import com.iot.smartparking.parking_be.common.Role;
 import com.iot.smartparking.parking_be.dto.request.auth.IntrospectRequest;
 import com.iot.smartparking.parking_be.dto.request.auth.LoginRequest;
 import com.iot.smartparking.parking_be.dto.request.auth.RegisterRequest;
@@ -133,7 +133,7 @@ public class AuthServiceImpl implements AuthService {
                 .username(registerRequest.getUsername())
                 .name(registerRequest.getFullName())
                 .password(passwordEncoder.encode(registerRequest.getPassword()))
-                .role(ROLE.ROLE_USER.toString())
+                .role(Role.ROLE_USER.toString())
                 .createdAt(LocalDateTime.now())
                 .build() ;
         userRepository.save(user) ;

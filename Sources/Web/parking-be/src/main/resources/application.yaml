@@ -19,3 +19,20 @@ spring:
     signerKey: "1TjXchw5FloESb63Kc+DFhTARvpWL4jUGCwfGWxuG5SIf/1y/LgJxHnMqaF6A/ij"
     valid-duration: 1800
     refreshable-duration: 604800
+  cloudinary:
+    cloudinary.cloud_name: "dzvxgyg88"
+    cloudinary.api_key: "281855212738654"
+    cloudinary.api_secret: "CBx98FIol43xihZJt0fX1AKgt9E"
+  esp32:
+    api-key: 2e71771b-bc30-4a1c-9c4d-ccba9c138d78
+  ai.server:
+    url: http://localhost:8000/api/plate-ocr
+    threadshold: 0.8
+
+logging:
+  level:
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+server:
+  port: 8080
