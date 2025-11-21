@@ -1,6 +1,6 @@
 package com.iot.smartparking.parking_be.configuration;
 
-import com.iot.smartparking.parking_be.common.ROLE;
+import com.iot.smartparking.parking_be.common.Role;
 import com.iot.smartparking.parking_be.model.User;
 import com.iot.smartparking.parking_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Configuration
@@ -26,7 +25,7 @@ public class ApplicationInitConfig {
                         .name("admin")
                         .createdAt(LocalDateTime.now())
                         .password(passwordEncoder.encode("admin"))
-                        .role(ROLE.ROLE_ADMIN.toString())
+                        .role(Role.ROLE_ADMIN.toString())
                         .build() ;
                 userRepository.save(user) ;
             }
