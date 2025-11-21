@@ -7,9 +7,13 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-public class CheckInResponseDTO {
-    private String status ;
+public class ParkingSessionDTO {
     private String licensePlate ;
     private String ownerName ;
-    private LocalDateTime checkInAt ;
+    private String imageOutUrl ;
+    private String imageInUrl ;
+    private String status ;
+    private LocalDateTime timeIn ;
+    private LocalDateTime timeOut ;
+
 }

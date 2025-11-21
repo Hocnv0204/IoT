@@ -8,7 +8,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "vehicle")
-@Data
+@Getter
+@Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -23,9 +24,6 @@ public class Vehicle {
     // Car / motorbike
     String type ;
 
-//    @ManyToOne
-//    @JoinColumn(name = "user_id" , nullable = false)
-//    User user;
     @Column(name = "owner_name" , nullable = false)
     private String ownerName ;
 
@@ -33,7 +31,7 @@ public class Vehicle {
     @JoinColumn(name = "card_id" , nullable = false)
     RFIDCard card ;
 
-    @OneToMany
+    @OneToMany(mappedBy = "vehicle")
     List<ParkingSession> parkingSessions ;
 
     @Column(name = "status")
