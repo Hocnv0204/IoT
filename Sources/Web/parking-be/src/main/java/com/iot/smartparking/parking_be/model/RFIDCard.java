@@ -9,7 +9,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "card")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,6 +31,6 @@ public class RFIDCard {
     @Column(name = "expired_at")
     LocalDateTime expiredAt ;
 
-    @OneToMany
+    @OneToMany(mappedBy = "card")
     List<ParkingSession> parkingSessions ;
 }
