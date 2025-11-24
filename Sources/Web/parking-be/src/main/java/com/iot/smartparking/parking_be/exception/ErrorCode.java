@@ -16,7 +16,8 @@ public enum ErrorCode {
     VEHICLE_NOT_FOUND(404 , "Vehicle not found" , HttpStatus.NOT_FOUND) ,
     VEHICLE_ALREADY_IN(409 , "Vehicle already in park" , HttpStatus.CONFLICT) ,
     VEHICLE_ALREADY_OUT(409 , "Vehicle already out park" , HttpStatus.CONFLICT) ,
-    VEHICLE_IS_INVALID_WITH_CARD(409, "License plate mismatch" , HttpStatus.CONFLICT) ;
+    VEHICLE_IS_INVALID_WITH_CARD(409, "License plate mismatch" , HttpStatus.CONFLICT) ,
+    CUSTOMER_NOT_FOUND(404 , "Customer not found" , HttpStatus.NOT_FOUND) ;
 
 
 

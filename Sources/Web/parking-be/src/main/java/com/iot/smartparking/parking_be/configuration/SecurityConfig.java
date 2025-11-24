@@ -47,7 +47,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOrigin("http://localhost:5173"); // Cho phép React
+        config.addAllowedOrigin("http://localhost:5173/"); // Cho phép React
         config.addAllowedMethod("*"); // GET, POST, PUT, DELETE...
         config.addAllowedHeader("*");
         config.setAllowCredentials(true); // Nếu frontend gửi cookie/token

@@ -4,6 +4,7 @@ import com.iot.smartparking.parking_be.common.CardType;
 import com.iot.smartparking.parking_be.common.CardStatus;
 import com.iot.smartparking.parking_be.dto.PageResponse;
 import com.iot.smartparking.parking_be.dto.VehicleDTO;
+import com.iot.smartparking.parking_be.dto.request.CreateVehicleRequest;
 import com.iot.smartparking.parking_be.dto.request.admin.RegisterVehicle;
 import com.iot.smartparking.parking_be.dto.request.admin.UpdateCardVehicle;
 import com.iot.smartparking.parking_be.dto.request.admin.UpdateVehicle;
@@ -24,6 +25,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -68,6 +71,32 @@ public class VehicleServiceImpl implements VehicleService {
         vehicleRepository.save(vehicle) ;
         return vehicleMapper.toDto(vehicle) ;
     }
+
+    @Override
+    public VehicleDTO createVehicle(CreateVehicleRequest request) {
+        // Kiểm tra biển số xe đã tồn tại chưa
+        if (vehicleRepository.existsByLicensePlate(request.getLicensePlate())) {
+            throw new AppException(ErrorCode.VEHICLE_ALREADY_EXISTS);
+        }
+
+        // Tìm customer theo ID
+        Customer customer = customerRepository.findById(request.getCustomerId())
+                .orElseThrow(() -> new AppException(ErrorCode.CUSTOMER_NOT_FOUND));
+
+        // Tạo vehicle mới
+        Vehicle vehicle = Vehicle.builder()
+                .licensePlate(request.getLicensePlate())
+                .type(request.getType())
+                .brand(request.getBrand())
+                .color(request.getColor())
+                .customer(customer)
+                .status("ACTIVE")
+                .build();
+
+        Vehicle savedVehicle = vehicleRepository.save(vehicle);
+        return vehicleMapper.toDto(savedVehicle);
+    }
+
     @Override
     public VehicleDTO getVehicle(int vehicleId){
         Vehicle vehicle = vehicleRepository.findById(vehicleId).orElseThrow(
@@ -137,5 +166,30 @@ public class VehicleServiceImpl implements VehicleService {
         Page<Vehicle> page = vehicleRepository.findAll(pageable);
         Page<VehicleDTO> pageDto = page.map(vehicleMapper :: toDto) ;
         return pageMapper.toPageResponse(pageDto) ;
+    }
+
+    @Override
+    public List<VehicleDTO> searchVehicles(Integer customerId, String plate) {
+        // If customerId provided, fetch vehicles by customer and optionally filter by plate
+        if (customerId != null) {
+            List<Vehicle> vehicles = vehicleRepository.findByCustomerId(customerId);
+            if (plate != null && !plate.trim().isEmpty()) {
+                String p = plate.toLowerCase();
+                return vehicles.stream()
+                        .filter(v -> v.getLicensePlate() != null && v.getLicensePlate().toLowerCase().contains(p))
+                        .map(vehicleMapper::toDto)
+                        .collect(Collectors.toList());
+            }
+            return vehicles.stream().map(vehicleMapper::toDto).collect(Collectors.toList());
+        }
+
+        // If only plate provided, use repository method
+        if (plate != null && !plate.trim().isEmpty()) {
+            List<Vehicle> vehicles = vehicleRepository.findByLicensePlateContainingIgnoreCase(plate);
+            return vehicles.stream().map(vehicleMapper::toDto).collect(Collectors.toList());
+        }
+
+        // If no params provided, return empty list to avoid huge results
+        return List.of();
     }
 }

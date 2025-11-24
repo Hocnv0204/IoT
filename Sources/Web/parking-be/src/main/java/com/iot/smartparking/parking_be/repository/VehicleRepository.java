@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface VehicleRepository extends JpaRepository<Vehicle , Integer>
@@ -18,4 +19,6 @@ Optional<Vehicle> findById(int id) ;
 Page<Vehicle> findAll(Pageable pageable ) ;
 Optional<Vehicle> findByCardId(int id) ;
 long count() ;
+List<Vehicle> findByCustomerId(Integer customerId);
+List<Vehicle> findByLicensePlateContainingIgnoreCase(String plate);
 }
