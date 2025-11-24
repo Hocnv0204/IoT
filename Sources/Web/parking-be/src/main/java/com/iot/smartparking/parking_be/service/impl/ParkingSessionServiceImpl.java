@@ -28,6 +28,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     static class DbResult{
         RFIDCard card ;
         Vehicle vehicle ;
+        ParkingSession parkingSession ;
     }
     @Transactional
     @Override
@@ -70,13 +72,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             Vehicle vehicle = vehicleRepository.findByCardId(card.getId())
                     .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
 
+
             // Kiểm tra xe có trong bãi không
             boolean isAlreadyIn = parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId(), ParkStatus.IN.name());
             if (isAlreadyIn) {
                 throw new AppException(ErrorCode.VEHICLE_ALREADY_IN);
             }
-
-
 
 
             return DbResult.builder().card(card).vehicle(vehicle).build();
@@ -120,16 +121,14 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     // Logic Thành công -> Lưu vào DB
                     // Lưu ý: Save DB cũng là blocking nên cần bọc lại
                     return Mono.fromCallable(() -> {
-                        ParkingSession session = ParkingSession.builder()
+                       ParkingSession parkingSession = ParkingSession.builder()
                                 .vehicle(vehicle)
                                 .imageIn(imageUrl)
                                 .card(card)
                                 .timeIn(LocalDateTime.now())
                                 .status(ParkStatus.IN.name())
                                 .build();
-
-                        ParkingSession savedSession = parkingSessionRepository.save(session);
-
+                       ParkingSession savedSession = parkingSessionRepository.save(parkingSession) ;
                         return CheckInResponseDTO.builder()
                                 .ownerName(vehicle.getOwnerName())
                                 .checkInAt(savedSession.getTimeIn())
@@ -211,13 +210,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             Vehicle vehicle = vehicleRepository.findByCardId(card.getId())
                     .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
 
+            ParkingSession parkingSession = parkingSessionRepository.findByCardIdAndStatus(card.getId() , ParkStatus.IN.name()).orElseThrow(
+                    () -> new AppException(ErrorCode.VEHICLE_NOT_FOUND)
+            ) ;
             // Kiểm tra xe có trong bãi không
             boolean isAlreadyIn = parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId(), ParkStatus.IN.name());
             if (!isAlreadyIn) {
                 throw new AppException(ErrorCode.VEHICLE_ALREADY_OUT);
             }
 
-            return DbResult.builder().card(card).vehicle(vehicle).build();
+            return DbResult.builder().card(card).parkingSession(parkingSession).vehicle(vehicle).build();
         }).subscribeOn(Schedulers.boundedElastic());
         // 2. Task AI: Gọi nhận dạng biển số (Chạy song song)
         Mono<String> aiTask = Mono.fromCallable(() -> {
@@ -259,13 +261,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     // Lưu ý: Save DB cũng là blocking nên cần bọc lại
                     return Mono.fromCallable(() -> {
 
-                        ParkingSession session = ParkingSession.builder()
-                                .vehicle(vehicle)
-                                .imageIn(imageUrl)
-                                .card(card)
-                                .timeIn(LocalDateTime.now())
-                                .status(ParkStatus.OUT.name())
-                                .build();
+                        ParkingSession session = dbResult.getParkingSession() ;
+                        session.setImageOut(imageUrl);
+                        session.setTimeOut(LocalDateTime.now());
+                        session.setStatus(ParkStatus.OUT.name());
 
                         ParkingSession savedSession = parkingSessionRepository.save(session);
 
@@ -281,42 +280,3 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
 }
-
-//String rfidUid = request.getRfidCard();
-//RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid).orElseThrow(
-//        () ->  new AppException(ErrorCode.CARD_NOT_FOUND)
-//) ;
-//Vehicle vehicle = vehicleRepository.findByCardId(card.getId()).orElseThrow(
-//        () -> new AppException(ErrorCode.VEHICLE_NOT_FOUND)
-//) ;
-//String imageFileName = fileStorageService.storeFile(image , "iot");
-//String imageUrl = fileStorageService.getFileUrl(imageFileName , "iot");
-//AiResponse aiResponse = aiService.recognizePlate(image) ;
-//String detectedPlate = (aiResponse != null && aiResponse.getPlateText() != null) ? aiResponse.getPlateText() : "UNKNOWN" ;
-//        if(parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId() , ParkStatus.IN.name())){
-//        throw new AppException(ErrorCode.VEHICLE_ALREADY_IN) ;
-//        }
-//                if(!vehicle.getLicensePlate().equals(detectedPlate)){
-//        return CheckInResponseDTO.builder()
-//                    .licensePlate(detectedPlate)
-//                    .checkInAt(LocalDateTime.now())
-//        .status(CheckStatus.DENIED.name())
-//        .build() ;
-//        }
-//                System.out.println(vehicle.getLicensePlate());
-//        System.out.println(detectedPlate);
-//ParkingSession parkingSession = ParkingSession.builder()
-//        .licensePlate(detectedPlate)
-//        .imageIn(imageUrl)
-//        .card(card)
-//        .timeIn(LocalDateTime.now())
-//        .status(ParkStatus.IN.name())
-//        .build() ;
-//        parkingSessionRepository.save(parkingSession) ;
-//        return CheckInResponseDTO.builder()
-//                .ownerName(vehicle.getOwnerName())
-//        .checkInAt(parkingSession.getTimeIn())
-//        .licensePlate(parkingSession.getLicensePlate())
-//        .status(CheckStatus.OPEN.name())
-//        .build() ;
-

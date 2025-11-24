@@ -31,5 +31,6 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession ,
     long countByTimeInBetween(LocalDateTime start , LocalDateTime end) ;
     long countByTimeOutBetween(LocalDateTime start , LocalDateTime end) ;
 
-    Optional<ParkingSession> findParkingSessionByCard(RFIDCard card) ;
+    Optional<ParkingSession> findByCardIdAndStatus(int cardId, String status);
+
 }
