@@ -130,7 +130,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                                 .build();
                        ParkingSession savedSession = parkingSessionRepository.save(parkingSession) ;
                         return CheckInResponseDTO.builder()
-                                .ownerName(vehicle.getOwnerName())
+                                .ownerName(vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : "Unknown")
                                 .checkInAt(savedSession.getTimeIn())
                                 .licensePlate(savedSession.getVehicle().getLicensePlate())
                                 .status(CheckStatus.OPEN.name())
@@ -148,14 +148,15 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
     @Override
     public PageResponse<ParkingSessionDTO> getLogs(LogRequest request , Pageable pageable){
-        Vehicle vehicle = null ;
+        Integer vehicleId = null ;
         if(request.getLicensePlate() != null) {
-            vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate()).orElseThrow(
+            Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate()).orElseThrow(
                     () -> new AppException(ErrorCode.VEHICLE_NOT_FOUND)
             );
+            vehicleId = vehicle.getId();
         }
 
-        Page<ParkingSession> page = parkingSessionRepository.getLogs(vehicle.getId() ,
+        Page<ParkingSession> page = parkingSessionRepository.getLogs(vehicleId ,
                  request.getStatus(),  request.getFromDate() , request.getToDate() , pageable
         ) ;
         Page<ParkingSessionDTO> pageDto = page.map(parkingSessionMapper :: toDto) ;
@@ -257,20 +258,27 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                                 .build());
                     }
 
-                    // Logic Thành công -> Lưu vào DB
+                    // Logic Thành công -> Update session hiện tại
                     // Lưu ý: Save DB cũng là blocking nên cần bọc lại
                     return Mono.fromCallable(() -> {
 
-                        ParkingSession session = dbResult.getParkingSession() ;
-                        session.setImageOut(imageUrl);
-                        session.setTimeOut(LocalDateTime.now());
-                        session.setStatus(ParkStatus.OUT.name());
+                        // Tìm session hiện tại (status = IN)
+                        ParkingSession currentSession = parkingSessionRepository
+                                .findByCardIdAndStatus(card.getId(), ParkStatus.IN.name())
+                                .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_ALREADY_OUT));
 
-                        ParkingSession savedSession = parkingSessionRepository.save(session);
+                        // Update session với thông tin checkout
+                        LocalDateTime now = LocalDateTime.now();
+                        currentSession.setTimeOut(now);
+                        currentSession.setImageOut(imageUrl);
+                        currentSession.setLicensePlateOut(detectedPlate);
+                        currentSession.setStatus(ParkStatus.OUT.name());
+
+                        ParkingSession savedSession = parkingSessionRepository.save(currentSession);
 
                         return CheckOutResponseDTO.builder()
-                                .ownerName(vehicle.getOwnerName())
-                                .checkOutAt(savedSession.getTimeIn())
+                                .ownerName(vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : "Unknown")
+                                .checkOutAt(savedSession.getTimeOut())
                                 .licensePlate(savedSession.getVehicle().getLicensePlate())
                                 .status(CheckStatus.OPEN.name())
                                 .imageUrl(imageUrl)

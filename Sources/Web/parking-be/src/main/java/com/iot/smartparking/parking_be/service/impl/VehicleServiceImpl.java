@@ -11,9 +11,11 @@ import com.iot.smartparking.parking_be.exception.AppException;
 import com.iot.smartparking.parking_be.exception.ErrorCode;
 import com.iot.smartparking.parking_be.mapper.PageMapper;
 import com.iot.smartparking.parking_be.mapper.VehicleMapper;
+import com.iot.smartparking.parking_be.model.Customer;
 import com.iot.smartparking.parking_be.model.RFIDCard;
 import com.iot.smartparking.parking_be.model.Vehicle;
 import com.iot.smartparking.parking_be.repository.CardRepository;
+import com.iot.smartparking.parking_be.repository.CustomerRepository;
 import com.iot.smartparking.parking_be.repository.VehicleRepository;
 import com.iot.smartparking.parking_be.service.VehicleService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import java.time.LocalDateTime;
 public class VehicleServiceImpl implements VehicleService {
     private final VehicleRepository vehicleRepository ;
     private final CardRepository cardRepository ;
+    private final CustomerRepository customerRepository ;
     private final VehicleMapper vehicleMapper ;
     private final PageMapper pageMapper ;
     @Override
@@ -45,11 +48,21 @@ public class VehicleServiceImpl implements VehicleService {
                 .issuedAt(LocalDateTime.now())
                 .build() ;
 
+        // Tìm hoặc tạo Customer
+        Customer customer = customerRepository.findByFullName(request.getOwnerName())
+                .orElseGet(() -> {
+                    Customer newCustomer = Customer.builder()
+                            .fullName(request.getOwnerName())
+                            .build();
+                    return customerRepository.save(newCustomer);
+                });
+
         Vehicle vehicle = Vehicle.builder()
                 .type(request.getVehicleType())
                 .licensePlate(request.getLicensePlate())
                 .card(card)
-                .ownerName(request.getOwnerName())
+                .status("ASSIGNED")
+                .customer(customer)
                 .build() ;
         cardRepository.save(card) ;
         vehicleRepository.save(vehicle) ;
@@ -72,12 +85,22 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setType(update.getType());
         }
         if(update.getOwnerName()!= null) {
-            vehicle.setOwnerName(update.getOwnerName());
+            // Tìm hoặc tạo Customer
+            Customer customer = customerRepository.findByFullName(update.getOwnerName())
+                    .orElseGet(() -> {
+                        Customer newCustomer = Customer.builder()
+                                .fullName(update.getOwnerName())
+                                .build();
+                        return customerRepository.save(newCustomer);
+                    });
+            vehicle.setCustomer(customer);
         }
         if(update.getLicensePlate() != null) {
             vehicle.setLicensePlate(update.getLicensePlate());
         }
-
+        if(update.getStatus() != null) {
+            vehicle.setStatus(update.getStatus());
+        }
         return vehicleMapper.toDto(vehicleRepository.save(vehicle)) ;
     }
 
@@ -86,9 +109,13 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository.findById(id).orElseThrow(
                 () -> new AppException(ErrorCode.VEHICLE_NOT_FOUND)
         ) ;
-        RFIDCard card = vehicle.getCard();
-        if(cardRepository.existsByCode(card.getCode())){
-            throw new AppException(ErrorCode.CARD_NOT_FOUND) ;
+        RFIDCard oldCard = vehicle.getCard();
+        // Kiểm tra xem card mới có trùng với card khác không (trừ card hiện tại)
+        if(cardRepository.existsByCode(request.getRfidUid())){
+            // Nếu card mới trùng với card hiện tại thì không lỗi
+            if(oldCard == null || !oldCard.getCode().equals(request.getRfidUid())){
+                throw new AppException(ErrorCode.CARD_ALREADY_EXISTS) ;
+            }
         }
         RFIDCard newCard =  RFIDCard.builder()
                 .type(CardType.MONTHLY.name())
@@ -97,7 +124,9 @@ public class VehicleServiceImpl implements VehicleService {
                 .issuedAt(LocalDateTime.now())
                 .build() ;
         vehicle.setCard(newCard);
-        cardRepository.delete(card);
+        if(oldCard != null) {
+            cardRepository.delete(oldCard);
+        }
         cardRepository.save(newCard) ;
         return vehicleMapper.toDto(vehicleRepository.save(vehicle)) ;
 

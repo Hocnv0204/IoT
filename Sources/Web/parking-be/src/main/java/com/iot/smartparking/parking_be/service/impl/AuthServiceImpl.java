@@ -131,7 +131,7 @@ public class AuthServiceImpl implements AuthService {
                 .phone(registerRequest.getPhone())
                 .email(registerRequest.getEmail())
                 .username(registerRequest.getUsername())
-                .name(registerRequest.getFullName())
+                .fullName(registerRequest.getFullName())
                 .password(passwordEncoder.encode(registerRequest.getPassword()))
                 .role(Role.ROLE_USER.toString())
                 .createdAt(LocalDateTime.now())

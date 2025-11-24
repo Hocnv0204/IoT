@@ -5,7 +5,6 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
 @Table(name="user")
@@ -17,16 +16,35 @@ import java.util.List;
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Integer id ;
-    String username ;
-    String password ;
-    String email;
-    String role ;
-    String name ;
-    String phone  ;
-    @Column(name = "created_at")
-    LocalDateTime createdAt ;
-    @Column(name = "updated_at")
-    LocalDateTime updatedAt ;
+    Integer id;
 
+    @Column(unique = true, nullable = false)
+    String username;
+
+    String password;
+    String email;
+
+    // ADMIN / GUARD
+    String role;
+
+    @Column(name = "full_name")
+    String fullName;
+
+    String phone;
+
+    @Column(name = "created_at")
+    LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
