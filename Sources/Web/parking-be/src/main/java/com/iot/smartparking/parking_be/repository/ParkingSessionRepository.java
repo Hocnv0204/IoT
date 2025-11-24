@@ -8,12 +8,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 public interface ParkingSessionRepository extends JpaRepository<ParkingSession , Integer> {
     @Query("SELECT CASE WHEN COUNT(ps) > 0 THEN true ELSE false END " +
             "FROM ParkingSession ps " +
             "WHERE ps.card.id = :cardId AND ps.status = :status")
     boolean existsParkingSessionByCardAndStatus(@Param("cardId") int cardId, @Param("status") String status);
+    
+    @Query("SELECT ps FROM ParkingSession ps " +
+            "WHERE ps.card.id = :cardId AND ps.status = :status")
+    Optional<ParkingSession> findByCardIdAndStatus(@Param("cardId") int cardId, @Param("status") String status);
     @Query("SELECT p FROM ParkingSession p WHERE " +
             "(:vehicleId) IS NULL OR p.vehicle.id = :vehicleId AND" +
             "(:status IS NULL OR p.status = :status) AND " +
