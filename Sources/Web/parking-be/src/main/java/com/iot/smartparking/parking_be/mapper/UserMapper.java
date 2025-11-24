@@ -9,7 +9,7 @@ public class UserMapper {
     public UserDTO toUserDTO(User user){
         return UserDTO.builder()
                 .email(user.getEmail())
-                .name(user.getName())
+                .name(user.getFullName())
                 .phoneNumber(user.getPhone())
                 .role(user.getRole())
                 .username(user.getUsername())

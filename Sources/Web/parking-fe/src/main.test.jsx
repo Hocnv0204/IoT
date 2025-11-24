@@ -1,0 +1,11 @@
+// File test tạm thời - xóa sau khi đã kiểm tra
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import LoginPage from "./components/LoginPage";
+import "./index.css";
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <LoginPage />
+  </StrictMode>
+);

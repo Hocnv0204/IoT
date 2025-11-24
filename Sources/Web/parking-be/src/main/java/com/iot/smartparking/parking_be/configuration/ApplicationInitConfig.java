@@ -22,7 +22,7 @@ public class ApplicationInitConfig {
             if(userRepository.findByUsername("admin").isEmpty()){
                 User user = User.builder()
                         .username("admin")
-                        .name("admin")
+                        .fullName("admin")
                         .createdAt(LocalDateTime.now())
                         .password(passwordEncoder.encode("admin"))
                         .role(Role.ROLE_ADMIN.toString())

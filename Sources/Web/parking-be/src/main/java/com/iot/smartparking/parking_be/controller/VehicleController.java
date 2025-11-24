@@ -1,5 +1,6 @@
 package com.iot.smartparking.parking_be.controller;
 
+import com.iot.smartparking.parking_be.dto.request.CreateVehicleRequest;
 import com.iot.smartparking.parking_be.dto.request.admin.RegisterVehicle;
 import com.iot.smartparking.parking_be.dto.request.admin.UpdateVehicle;
 import com.iot.smartparking.parking_be.dto.response.ApiResponse;
@@ -15,6 +16,17 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class VehicleController {
     private final VehicleService vehicleService ;
+    
+    @PostMapping
+    public ResponseEntity<ApiResponse<?>> createVehicle(@RequestBody CreateVehicleRequest request) {
+        return ResponseEntity.ok()
+                .body(
+                        ApiResponse.builder()
+                                .data(vehicleService.createVehicle(request))
+                                .message("Đăng ký xe cho khách hàng thành công")
+                                .build()
+                );
+    }
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<?>> register (@RequestBody RegisterVehicle request){
         return ResponseEntity.ok()

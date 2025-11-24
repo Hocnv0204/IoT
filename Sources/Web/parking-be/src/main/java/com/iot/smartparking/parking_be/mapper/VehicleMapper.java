@@ -10,7 +10,7 @@ public class VehicleMapper {
         return VehicleDTO.builder()
                 .id(vehicle.getId())
                 .licensePlate(vehicle.getLicensePlate())
-                .owner(vehicle.getOwnerName())
+                .owner(vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : null)
                 .vehicleType(vehicle.getType())
                 .build();
     }

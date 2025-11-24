@@ -10,7 +10,7 @@ public class ParkingSessionMapper {
         return ParkingSessionDTO.builder()
                 .status(session.getStatus())
                 .licensePlate(session.getVehicle().getLicensePlate())
-                .ownerName(session.getVehicle().getOwnerName())
+                .ownerName(session.getVehicle().getCustomer() != null ? session.getVehicle().getCustomer().getFullName() : null)
                 .imageInUrl(session.getImageIn())
                 .imageOutUrl(session.getImageOut())
                 .timeIn(session.getTimeIn())
