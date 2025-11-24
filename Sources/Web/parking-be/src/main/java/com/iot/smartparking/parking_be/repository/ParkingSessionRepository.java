@@ -1,6 +1,7 @@
 package com.iot.smartparking.parking_be.repository;
 
 import com.iot.smartparking.parking_be.model.ParkingSession;
+import com.iot.smartparking.parking_be.model.RFIDCard;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 public interface ParkingSessionRepository extends JpaRepository<ParkingSession , Integer> {
     @Query("SELECT CASE WHEN COUNT(ps) > 0 THEN true ELSE false END " +
@@ -28,4 +30,6 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession ,
     long countByStatus(String status) ;
     long countByTimeInBetween(LocalDateTime start , LocalDateTime end) ;
     long countByTimeOutBetween(LocalDateTime start , LocalDateTime end) ;
+
+    Optional<ParkingSession> findParkingSessionByCard(RFIDCard card) ;
 }

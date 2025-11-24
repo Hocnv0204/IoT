@@ -32,7 +32,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final PageMapper pageMapper ;
     @Override
     public VehicleDTO register(RegisterVehicle request){
-        if(vehicleRepository.existsByLicensePlate(request.getLicensePlate())){
+        if(vehicleRepository.existsByLicensePlateAndType(request.getLicensePlate() , request.getVehicleType())){
             throw new AppException(ErrorCode.VEHICLE_ALREADY_EXISTS) ;
         }
         if(cardRepository.existsByCode(request.getRfidUid())){
@@ -49,7 +49,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .type(request.getVehicleType())
                 .licensePlate(request.getLicensePlate())
                 .card(card)
-                .status("ASSIGNED")
                 .ownerName(request.getOwnerName())
                 .build() ;
         cardRepository.save(card) ;
@@ -78,9 +77,7 @@ public class VehicleServiceImpl implements VehicleService {
         if(update.getLicensePlate() != null) {
             vehicle.setLicensePlate(update.getLicensePlate());
         }
-        if(update.getStatus() != null) {
-            vehicle.setStatus(update.getStatus());
-        }
+
         return vehicleMapper.toDto(vehicleRepository.save(vehicle)) ;
     }
 

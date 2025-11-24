@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface VehicleRepository extends JpaRepository<Vehicle , Integer>
 {
 Optional <Vehicle>findByLicensePlate(String licensePlate) ;
-boolean existsByLicensePlate(String licensePlate) ;
+boolean existsByLicensePlateAndType(String licensePlate , String type ) ;
 Optional<Vehicle> findById(int id) ;
 Page<Vehicle> findAll(Pageable pageable ) ;
 Optional<Vehicle> findByCardId(int id) ;

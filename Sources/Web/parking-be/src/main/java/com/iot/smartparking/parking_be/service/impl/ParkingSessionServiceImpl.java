@@ -76,6 +76,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 throw new AppException(ErrorCode.VEHICLE_ALREADY_IN);
             }
 
+
+
+
             return DbResult.builder().card(card).vehicle(vehicle).build();
         }).subscribeOn(Schedulers.boundedElastic());
         // 2. Task AI: Gọi nhận dạng biển số (Chạy song song)
@@ -255,6 +258,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     // Logic Thành công -> Lưu vào DB
                     // Lưu ý: Save DB cũng là blocking nên cần bọc lại
                     return Mono.fromCallable(() -> {
+
                         ParkingSession session = ParkingSession.builder()
                                 .vehicle(vehicle)
                                 .imageIn(imageUrl)

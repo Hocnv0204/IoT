@@ -34,6 +34,5 @@ public class Vehicle {
     @OneToMany(mappedBy = "vehicle")
     List<ParkingSession> parkingSessions ;
 
-    @Column(name = "status")
-    private String status ;
+
 }
