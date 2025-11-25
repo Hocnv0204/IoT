@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
@@ -50,6 +51,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final ParkingSessionRepository parkingSessionRepository ;
     private final ParkingSessionMapper parkingSessionMapper ;
     private final PageMapper pageMapper;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Data
     @Builder
@@ -132,9 +134,14 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                                 .checkInAt(savedSession.getTimeIn())
                                 .licensePlate(savedSession.getVehicle().getLicensePlate())
                                 .status(CheckStatus.OPEN.name())
+                                .cardType(card.getType())
                                 .imageUrl(imageUrl)
                                 .build();
                     }).subscribeOn(Schedulers.boundedElastic());
+                })
+                .doOnNext(response -> {
+                    log.info("WebSocket: gửi thông tin checkin của xe {} đến /topic/checkin", response.getLicensePlate());
+                    messagingTemplate.convertAndSend("/topic/checkin", response);
                 });
     }
     private boolean isPlateMatching(String dbPlate, String aiPlate) {
@@ -273,51 +280,19 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                         return CheckOutResponseDTO.builder()
                                 .ownerName(vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : "Unknown")
                                 .checkOutAt(savedSession.getTimeOut())
+                                .checkInAt(savedSession.getTimeIn())
                                 .licensePlate(savedSession.getVehicle().getLicensePlate())
                                 .status(CheckStatus.OPEN.name())
+                                .cardType(card.getType())
                                 .imageUrl(imageUrl)
                                 .build();
                     }).subscribeOn(Schedulers.boundedElastic());
+                })
+                .doOnNext(response -> {
+                    log.info("WebSocket: gửi thông tin checkout của xe {} đến /topic/checkout", response.getLicensePlate());
+                    messagingTemplate.convertAndSend("/topic/checkout", response);
                 });
     }
 
 }
-
-//String rfidUid = request.getRfidCard();
-//RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid).orElseThrow(
-//        () ->  new AppException(ErrorCode.CARD_NOT_FOUND)
-//) ;
-//Vehicle vehicle = vehicleRepository.findByCardId(card.getId()).orElseThrow(
-//        () -> new AppException(ErrorCode.VEHICLE_NOT_FOUND)
-//) ;
-//String imageFileName = fileStorageService.storeFile(image , "iot");
-//String imageUrl = fileStorageService.getFileUrl(imageFileName , "iot");
-//AiResponse aiResponse = aiService.recognizePlate(image) ;
-//String detectedPlate = (aiResponse != null && aiResponse.getPlateText() != null) ? aiResponse.getPlateText() : "UNKNOWN" ;
-//        if(parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId() , ParkStatus.IN.name())){
-//        throw new AppException(ErrorCode.VEHICLE_ALREADY_IN) ;
-//        }
-//                if(!vehicle.getLicensePlate().equals(detectedPlate)){
-//        return CheckInResponseDTO.builder()
-//                    .licensePlate(detectedPlate)
-//                    .checkInAt(LocalDateTime.now())
-//        .status(CheckStatus.DENIED.name())
-//        .build() ;
-//        }
-//                System.out.println(vehicle.getLicensePlate());
-//        System.out.println(detectedPlate);
-//ParkingSession parkingSession = ParkingSession.builder()
-//        .licensePlate(detectedPlate)
-//        .imageIn(imageUrl)
-//        .card(card)
-//        .timeIn(LocalDateTime.now())
-//        .status(ParkStatus.IN.name())
-//        .build() ;
-//        parkingSessionRepository.save(parkingSession) ;
-//        return CheckInResponseDTO.builder()
-//                .ownerName(vehicle.getOwnerName())
-//        .checkInAt(parkingSession.getTimeIn())
-//        .licensePlate(parkingSession.getLicensePlate())
-//        .status(CheckStatus.OPEN.name())
-//        .build() ;
 

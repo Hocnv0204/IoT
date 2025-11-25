@@ -11,5 +11,7 @@ public class CheckOutResponseDTO {
     private String licensePlate ;
     private String ownerName ;
     private LocalDateTime checkOutAt ;
+    private LocalDateTime checkInAt ;
     private String imageUrl ;
+    private String cardType ;
 }
