@@ -1,81 +1,115 @@
 package com.iot.smartparking.parking_be.service.impl;
 
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
-import com.iot.smartparking.parking_be.service.CloudinaryService;
 import com.iot.smartparking.parking_be.service.FileStorageService;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
+@Slf4j
 public class FileStorageServiceImpl implements FileStorageService {
-    private final CloudinaryService cloudinaryService;
-    private final Cloudinary cloudinary;
+    private static final String UPLOAD_DIR = "images";
+    private final Path rootLocation;
+
+    public FileStorageServiceImpl() {
+        this.rootLocation = Paths.get(UPLOAD_DIR);
+        init();
+    }
+
+    private void init() {
+        try {
+            if (!Files.exists(rootLocation)) {
+                Files.createDirectories(rootLocation);
+                log.info("Created upload directory: {}", rootLocation.toAbsolutePath());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Could not initialize storage", e);
+        }
+    }
 
     @Override
     public String storeFile(MultipartFile file, String subDirectory) {
         try {
-            return cloudinaryService.uploadFile(file, subDirectory);
+            if (file.isEmpty()) {
+                throw new RuntimeException("Failed to store empty file");
+            }
+
+            // Tạo tên file unique
+            String originalFilename = file.getOriginalFilename();
+            String extension = "";
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+            String fileName = UUID.randomUUID().toString() + extension;
+
+            // Tạo thư mục con nếu có subDirectory
+            Path targetLocation;
+            if (subDirectory != null && !subDirectory.isEmpty()) {
+                Path subDir = rootLocation.resolve(subDirectory);
+                if (!Files.exists(subDir)) {
+                    Files.createDirectories(subDir);
+                }
+                targetLocation = subDir.resolve(fileName);
+            } else {
+                targetLocation = rootLocation.resolve(fileName);
+            }
+
+            // Lưu file
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            log.info("File stored successfully: {}", targetLocation.toAbsolutePath());
+
+            // Trả về đường dẫn tương đối để lưu vào DB
+            String relativePath = targetLocation.toString().replace("\\", "/");
+            return relativePath;
         } catch (IOException e) {
             throw new RuntimeException("Failed to store file", e);
         }
     }
 
     @Override
-    public void deleteFile(String fileUrl, String subDirectory) {
-        if (fileUrl == null || fileUrl.isEmpty()) {
-            System.out.println("Warning: Attempted to delete a file with null or empty URL.");
+    public void deleteFile(String filePath, String subDirectory) {
+        if (filePath == null || filePath.isEmpty()) {
+            log.warn("Attempted to delete a file with null or empty path.");
             return;
         }
 
-        String publicId;
         try {
-            int uploadIndex = fileUrl.indexOf("/upload/");
-            if (uploadIndex == -1) {
-                throw new IllegalArgumentException("Invalid Cloudinary URL format: missing '/upload/' segment. URL: " + fileUrl);
-            }
-
-            String pathSegment = fileUrl.substring(uploadIndex + "/upload/".length());
-
-            if (pathSegment.startsWith("v") && pathSegment.contains("/")) {
-                int firstSlashAfterVersion = pathSegment.indexOf('/');
-                if (firstSlashAfterVersion != -1) {
-                    pathSegment = pathSegment.substring(firstSlashAfterVersion + 1);
-                } else {
-                    throw new IllegalArgumentException("Invalid Cloudinary URL format: version segment not followed by path in " + fileUrl);
-                }
-            }
-
-            int lastDotIndex = pathSegment.lastIndexOf(".");
-            if (lastDotIndex != -1) {
-                publicId = pathSegment.substring(0, lastDotIndex);
+            Path fileToDelete;
+            // Nếu filePath là URL (bắt đầu với /images/), lấy phần path
+            if (filePath.startsWith("/images/")) {
+                fileToDelete = rootLocation.resolve(filePath.substring("/images/".length()));
+            } else if (filePath.startsWith("images/")) {
+                fileToDelete = rootLocation.resolve(filePath.substring("images/".length()));
             } else {
-                publicId = pathSegment;
+                // Nếu là relative path từ storeFile
+                fileToDelete = Paths.get(filePath);
             }
 
-            if (subDirectory != null && !subDirectory.isEmpty() && !publicId.startsWith(subDirectory + "/")) {
-                System.out.println("Warning: Public ID does not match expected subDirectory. Public ID: " + publicId + ", Expected subDirectory: " + subDirectory + ". URL: " + fileUrl);
+            if (Files.exists(fileToDelete)) {
+                Files.delete(fileToDelete);
+                log.info("File deleted successfully: {}", fileToDelete.toAbsolutePath());
+            } else {
+                log.warn("File not found for deletion: {}", fileToDelete.toAbsolutePath());
             }
-
-            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-            System.out.println("Cloudinary delete result for publicId: " + publicId + " -> " + result);
-
         } catch (IOException e) {
-            throw new RuntimeException("Failed to delete file from Cloudinary: " + fileUrl, e);
-        } catch (Exception e) { // Bắt Exception chung để đảm bảo an toàn với StringIndexOutOfBoundsException và các lỗi parsing khác
-            throw new RuntimeException("Error parsing Cloudinary URL or deleting file: " + fileUrl + ". Original Error: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to delete file: " + filePath, e);
         }
     }
 
     @Override
     public String getFileUrl(String fileName, String subDirectory) {
-        // Cloudinary trả về URL khi upload, bạn nên lưu URL này vào DB và dùng lại
-        // Nếu cần build lại URL, bạn có thể tự nối theo cấu trúc Cloudinary
-        return  fileName;
+        // fileName đã là relative path từ storeFile (ví dụ: images/iot/uuid.jpg)
+        // Trả về URL để frontend có thể truy cập
+        if (fileName.startsWith("/")) {
+            return fileName;
+        }
+        return "/" + fileName;
     }
 }
