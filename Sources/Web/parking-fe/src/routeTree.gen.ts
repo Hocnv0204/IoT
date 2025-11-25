@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterMonthlyRouteImport } from './routes/register-monthly'
+import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const RegisterMonthlyRoute = RegisterMonthlyRouteImport.update({
   id: '/register-monthly',
   path: '/register-monthly',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MonitoringRoute = MonitoringRouteImport.update({
+  id: '/monitoring',
+  path: '/monitoring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/monitoring': typeof MonitoringRoute
   '/register-monthly': typeof RegisterMonthlyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/monitoring': typeof MonitoringRoute
   '/register-monthly': typeof RegisterMonthlyRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/monitoring': typeof MonitoringRoute
   '/register-monthly': typeof RegisterMonthlyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/login' | '/register-monthly'
+  fullPaths: '/' | '/dashboard' | '/login' | '/monitoring' | '/register-monthly'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/login' | '/register-monthly'
-  id: '__root__' | '/' | '/dashboard' | '/login' | '/register-monthly'
+  to: '/' | '/dashboard' | '/login' | '/monitoring' | '/register-monthly'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/monitoring'
+    | '/register-monthly'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  MonitoringRoute: typeof MonitoringRoute
   RegisterMonthlyRoute: typeof RegisterMonthlyRoute
 }
 
@@ -76,6 +92,13 @@ declare module '@tanstack/react-router' {
       path: '/register-monthly'
       fullPath: '/register-monthly'
       preLoaderRoute: typeof RegisterMonthlyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/monitoring': {
+      id: '/monitoring'
+      path: '/monitoring'
+      fullPath: '/monitoring'
+      preLoaderRoute: typeof MonitoringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -106,6 +129,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  MonitoringRoute: MonitoringRoute,
   RegisterMonthlyRoute: RegisterMonthlyRoute,
 }
 export const routeTree = rootRouteImport
