@@ -13,4 +13,5 @@ public class CheckInResponseDTO {
     private String ownerName ;
     private LocalDateTime checkInAt ;
     private String imageUrl ;
+    private String cardType  ;
 }
