@@ -5,7 +5,7 @@ export const vehicleService = {
     const params = {};
     if (customerId != null) params.customerId = customerId;
     if (plate != null) params.plate = plate;
-    const response = await apiClient.get("/vehicles/search", { params });
+    const response = await apiClient.get("/vehicle/search", { params });
     return response.data.data;
   },
 
