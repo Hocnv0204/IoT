@@ -76,4 +76,18 @@ public class VehicleController {
                 ) ;
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<?>> searchVehicles(
+            @RequestParam(name = "customerId", required = false) Integer customerId,
+            @RequestParam(name = "plate", required = false) String plate
+    ) {
+        return ResponseEntity.ok()
+                .body(
+                        ApiResponse.builder()
+                                .data(vehicleService.searchVehicles(customerId, plate))
+                                .message("Tìm kiếm xe thành công")
+                                .build()
+                );
+    }
+
 }
