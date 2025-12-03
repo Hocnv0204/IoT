@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tag, Descriptions, Typography, Spin, Empty } from 'antd';
+import { Card, Tag, Descriptions, Typography, Spin, Empty, Input } from 'antd';
 import { Video, Car, CreditCard, User, Clock, FileText, AlertCircle } from 'lucide-react';
 import { websocketService } from '../services/websocketService';
 
@@ -9,6 +9,13 @@ export default function MonitoringPage() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [currentEvent, setCurrentEvent] = useState(null);
+  const [scannedCardId, setScannedCardId] = useState('');
+  
+  // ESP32 Integration State
+  const [esp32Ip, setEsp32Ip] = useState('10.1.0.45'); // Default IP from user logs
+  const [esp32Connected, setEsp32Connected] = useState(false);
+  const [videoUrl, setVideoUrl] = useState(null);
+
   
   // Placeholder for video streams - in production these would be real MJPEG streams
   const entryCameraUrl = "https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=1000&auto=format&fit=crop"; 
@@ -17,16 +24,26 @@ export default function MonitoringPage() {
   useEffect(() => {
     const handleEvent = (data) => {
       console.log("New parking event:", data);
+      
+      // Log specifically for ESP32 data
+      if (data.rfid) {
+        console.log("✅ [ESP32] Received RFID data from ESP32:", data.rfid);
+      }
+
       setCurrentEvent(data);
+      if (data.rfid) {
+        setScannedCardId(data.rfid);
+      }
     };
 
     websocketService.connect(
       () => {
+        console.log("🚀 [System] Frontend connected to Backend WebSocket. Ready to receive ESP32 events.");
         setConnected(true);
         setLoading(false);
       },
       (err) => {
-        console.error("WS Error", err);
+        console.error("❌ [System] WebSocket Connection Error:", err);
         setConnected(false);
         setLoading(false);
       }
@@ -37,8 +54,49 @@ export default function MonitoringPage() {
     return () => {
       unsubscribe();
       websocketService.disconnect();
+      websocketService.disconnectEsp32();
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
     };
   }, []);
+
+  // Handle ESP32 Connection
+  const handleConnectEsp32 = () => {
+    if (esp32Connected) {
+        websocketService.disconnectEsp32();
+        setEsp32Connected(false);
+        setVideoUrl(null);
+        return;
+    }
+
+    websocketService.connectToEsp32(
+        esp32Ip,
+        () => {
+            console.log("✅ [ESP32] Connected to Camera & RFID");
+            setEsp32Connected(true);
+        },
+        (data) => {
+            if (data.type === 'CHECK_IN') {
+                console.log("✅ [ESP32] RFID Scanned:", data.rfid);
+                setScannedCardId(data.rfid);
+                // Optional: Send to backend if needed, but currently just displaying
+            } else if (data.type === 'VIDEO_FRAME') {
+                // Create Blob from ArrayBuffer
+                const blob = new Blob([data.data], { type: 'image/jpeg' });
+                const url = URL.createObjectURL(blob);
+                setVideoUrl((prev) => {
+                    if (prev) URL.revokeObjectURL(prev); // Clean up old URL
+                    return url;
+                });
+            }
+        },
+        () => {
+            console.log("❌ [ESP32] Disconnected");
+            setEsp32Connected(false);
+            setVideoUrl(null);
+        }
+    );
+  };
+
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -67,6 +125,51 @@ export default function MonitoringPage() {
           </div>
         </div>
 
+        {/* ESP32 Connection Panel */}
+        <Card className="shadow-sm border-l-4 border-l-orange-500">
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <Text strong>ESP32 IP:</Text>
+                    <Input 
+                        value={esp32Ip} 
+                        onChange={(e) => setEsp32Ip(e.target.value)} 
+                        placeholder="192.168.1.x" 
+                        style={{ width: '150px' }}
+                        disabled={esp32Connected}
+                    />
+                </div>
+                <button 
+                    onClick={handleConnectEsp32}
+                    className={`px-4 py-2 rounded font-bold text-white transition-colors ${
+                        esp32Connected 
+                        ? 'bg-red-500 hover:bg-red-600' 
+                        : 'bg-green-500 hover:bg-green-600'
+                    }`}
+                >
+                    {esp32Connected ? 'Ngắt kết nối ESP32' : 'Kết nối ESP32'}
+                </button>
+                {esp32Connected && <Tag color="green">Đã kết nối Camera & RFID</Tag>}
+            </div>
+        </Card>
+
+        {/* Card Scanner Input */}
+        <Card className="shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-blue-600">
+               <CreditCard size={24} />
+               <Text strong className="text-lg">Mã thẻ vừa quét:</Text>
+            </div>
+            <Input 
+                value={scannedCardId} 
+                onChange={(e) => setScannedCardId(e.target.value)} 
+                placeholder="Chờ quẹt thẻ..." 
+                style={{ maxWidth: '400px', fontSize: '1.2em', fontWeight: 'bold', color: '#1890ff' }}
+                readOnly
+            />
+            <Text type="secondary" className="text-xs">(Dữ liệu từ ESP32-CAM)</Text>
+          </div>
+        </Card>
+
         {/* Video Feeds */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Entry Camera */}
@@ -77,7 +180,7 @@ export default function MonitoringPage() {
           >
             <div className="relative aspect-video bg-black flex items-center justify-center group">
               <img 
-                src={entryCameraUrl} 
+                src={videoUrl || entryCameraUrl} 
                 alt="Entry Camera" 
                 className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
               />
@@ -101,7 +204,7 @@ export default function MonitoringPage() {
           <Card 
             title={<div className="flex items-center gap-2"><Video size={18}/> Camera Lối ra (Exit)</div>}
             className="shadow-md overflow-hidden"
-            bodyStyle={{ padding: 0 }}
+            styles={{ body: { padding: 0 } }}
           >
             <div className="relative aspect-video bg-black flex items-center justify-center group">
               <img 
