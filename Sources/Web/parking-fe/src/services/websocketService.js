@@ -99,6 +99,54 @@ class WebSocketService {
       }
     }
   }
+  // --- ESP32 WebSocket Handling ---
+  connectToEsp32(ip, onOpen, onMessage, onClose) {
+    if (this.esp32Socket) {
+      this.esp32Socket.close();
+    }
+
+    const url = `ws://${ip}:81`;
+    console.log(`[ESP32] Connecting to ${url}...`);
+    
+    this.esp32Socket = new WebSocket(url);
+    this.esp32Socket.binaryType = "arraybuffer"; // Important for video stream
+
+    this.esp32Socket.onopen = () => {
+      console.log("[ESP32] Connected!");
+      if (onOpen) onOpen();
+    };
+
+    this.esp32Socket.onmessage = (event) => {
+      if (typeof event.data === "string") {
+        // Text data (JSON) - RFID
+        try {
+            const data = JSON.parse(event.data);
+            if (onMessage) onMessage(data);
+        } catch (e) {
+            console.error("[ESP32] JSON Parse Error:", e);
+        }
+      } else {
+        // Binary data - Video Frame
+        if (onMessage) onMessage({ type: 'VIDEO_FRAME', data: event.data });
+      }
+    };
+
+    this.esp32Socket.onclose = () => {
+      console.log("[ESP32] Disconnected");
+      if (onClose) onClose();
+    };
+
+    this.esp32Socket.onerror = (error) => {
+      console.error("[ESP32] Error:", error);
+    };
+  }
+
+  disconnectEsp32() {
+    if (this.esp32Socket) {
+      this.esp32Socket.close();
+      this.esp32Socket = null;
+    }
+  }
 }
 
 export const websocketService = new WebSocketService();
