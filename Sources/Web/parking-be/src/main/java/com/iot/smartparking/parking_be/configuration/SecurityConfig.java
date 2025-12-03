@@ -28,6 +28,8 @@ public class SecurityConfig {
         httpSecurity
                 .csrf(AbstractHttpConfigurer :: disable)
                 .authorizeHttpRequests( request -> request
+                        // Cho phép WebSocket endpoint cho ESP32-CAM
+                        .requestMatchers("/websocket/websocket").permitAll()
                         .anyRequest().permitAll())
                 .oauth2ResourceServer(
                         oauth2 -> oauth2

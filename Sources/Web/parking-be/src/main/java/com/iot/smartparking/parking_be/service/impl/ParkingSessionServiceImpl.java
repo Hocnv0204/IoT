@@ -1,5 +1,6 @@
 package com.iot.smartparking.parking_be.service.impl;
 
+import com.iot.smartparking.parking_be.common.CardType;
 import com.iot.smartparking.parking_be.common.CheckStatus;
 import com.iot.smartparking.parking_be.common.ParkStatus;
 import com.iot.smartparking.parking_be.dto.AiResponse;
@@ -58,6 +59,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     static class DbResult{
         RFIDCard card ;
         Vehicle vehicle ;
+        boolean dailyTicket;
     }
     @Transactional
     @Override
@@ -68,9 +70,14 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid)
                     .orElseThrow(() -> new AppException(ErrorCode.CARD_NOT_FOUND));
 
-            // Tìm xe
-            Vehicle vehicle = vehicleRepository.findByCardId(card.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
+            boolean isDaily = isDailyCard(card);
+
+            // Tìm xe nếu là vé tháng
+            Vehicle vehicle = null;
+            if (!isDaily) {
+                vehicle = vehicleRepository.findByCardId(card.getId())
+                        .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
+            }
 
             // Kiểm tra xe có trong bãi không
             boolean isAlreadyIn = parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId(), ParkStatus.IN.name());
@@ -78,7 +85,11 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 throw new AppException(ErrorCode.VEHICLE_ALREADY_IN);
             }
 
-            return DbResult.builder().card(card).vehicle(vehicle).build();
+            return DbResult.builder()
+                    .card(card)
+                    .vehicle(vehicle)
+                    .dailyTicket(isDaily)
+                    .build();
         }).subscribeOn(Schedulers.boundedElastic());
         // 2. Task AI: Gọi nhận dạng biển số (Chạy song song)
         Mono<String> aiTask = Mono.fromCallable(() -> {
@@ -102,11 +113,14 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
                     Vehicle vehicle = dbResult.getVehicle();
                     RFIDCard card = dbResult.getCard();
+                    boolean isDaily = dbResult.isDailyTicket();
 
-                    log.info("DB Plate: {} - AI Plate: {}", vehicle.getLicensePlate(), detectedPlate);
+                    if (!isDaily && vehicle != null) {
+                        log.info("DB Plate: {} - AI Plate: {}", vehicle.getLicensePlate(), detectedPlate);
+                    }
 
-                    // Logic so sánh biển số
-                    if (!isPlateMatching(vehicle.getLicensePlate(), detectedPlate)) {
+                    // Logic so sánh biển số áp dụng cho vé tháng
+                    if (!isDaily && !isPlateMatching(vehicle.getLicensePlate(), detectedPlate)) {
                         // Từ chối nhưng không lưu Session (hoặc lưu session REJECT tùy logic)
                         return Mono.just(CheckInResponseDTO.builder()
                                 .licensePlate(detectedPlate)
@@ -120,8 +134,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     // Lưu ý: Save DB cũng là blocking nên cần bọc lại
                     return Mono.fromCallable(() -> {
                         ParkingSession session = ParkingSession.builder()
-                                .vehicle(vehicle)
+                                .vehicle(isDaily ? null : vehicle)
                                 .imageIn(imageUrl)
+                                .licensePlateIn(detectedPlate)
                                 .card(card)
                                 .timeIn(LocalDateTime.now())
                                 .status(ParkStatus.IN.name())
@@ -129,10 +144,17 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
                         ParkingSession savedSession = parkingSessionRepository.save(session);
 
+                        String licensePlateResp = isDaily
+                                ? detectedPlate
+                                : savedSession.getVehicle().getLicensePlate();
+                        String ownerName = isDaily
+                                ? "Daily ticket"
+                                : (vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : "Unknown");
+
                         return CheckInResponseDTO.builder()
-                                .ownerName(vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : "Unknown")
+                                .ownerName(ownerName)
                                 .checkInAt(savedSession.getTimeIn())
-                                .licensePlate(savedSession.getVehicle().getLicensePlate())
+                                .licensePlate(licensePlateResp)
                                 .status(CheckStatus.OPEN.name())
                                 .cardType(card.getType())
                                 .imageUrl(imageUrl)
@@ -151,6 +173,41 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         String cleanAi = aiPlate.replace(".", "").replace("-", "").replace(" ", "").toUpperCase();
         return cleanDb.equals(cleanAi);
     }
+
+    private boolean isDailyCard(RFIDCard card) {
+        return CardType.DAILY.name().equalsIgnoreCase(card.getType());
+    }
+
+    private double calculateTotalFee(LocalDateTime start, LocalDateTime end) {
+        LocalTime dayStart = LocalTime.of(6, 0);
+        LocalTime dayEnd = LocalTime.of(18, 0);
+        double totalFee = 0;
+
+        // Duyệt từng ngày trong khoảng start đến end
+        LocalDate currentDate = start.toLocalDate();
+        LocalDate endDate = end.toLocalDate();
+
+        while (!currentDate.isAfter(endDate)) {
+            // Xác định thời gian trong ngày hiện tại
+            LocalTime timeToCheck;
+
+            if (currentDate.equals(start.toLocalDate())) {
+                timeToCheck = start.toLocalTime();
+            } else {
+                // Mặc định lấy 12 giờ trưa để kiểm tra ngày hay đêm
+                timeToCheck = LocalTime.NOON;
+            }
+
+            boolean inDayRange = !timeToCheck.isBefore(dayStart) && timeToCheck.isBefore(dayEnd);
+            double dayFee = inDayRange ? 5000d : 10000d;
+            totalFee += dayFee;
+
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return totalFee;
+    }
+
     @Override
     public PageResponse<ParkingSessionDTO> getLogs(LogRequest request , Pageable pageable){
         Integer vehicleId = null ;
@@ -212,9 +269,14 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid)
                     .orElseThrow(() -> new AppException(ErrorCode.CARD_NOT_FOUND));
 
-            // Tìm xe
-            Vehicle vehicle = vehicleRepository.findByCardId(card.getId())
-                    .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
+            boolean isDaily = isDailyCard(card);
+
+            // Tìm xe nếu là vé tháng
+            Vehicle vehicle = null;
+            if (!isDaily) {
+                vehicle = vehicleRepository.findByCardId(card.getId())
+                        .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
+            }
 
             // Kiểm tra xe có trong bãi không
             boolean isAlreadyIn = parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId(), ParkStatus.IN.name());
@@ -222,7 +284,11 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 throw new AppException(ErrorCode.VEHICLE_ALREADY_OUT);
             }
 
-            return DbResult.builder().card(card).vehicle(vehicle).build();
+            return DbResult.builder()
+                    .card(card)
+                    .vehicle(vehicle)
+                    .dailyTicket(isDaily)
+                    .build();
         }).subscribeOn(Schedulers.boundedElastic());
         // 2. Task AI: Gọi nhận dạng biển số (Chạy song song)
         Mono<String> aiTask = Mono.fromCallable(() -> {
@@ -246,19 +312,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
                     Vehicle vehicle = dbResult.getVehicle();
                     RFIDCard card = dbResult.getCard();
-
-                    log.info("DB Plate: {} - AI Plate: {}", vehicle.getLicensePlate(), detectedPlate);
-
-                    // Logic so sánh biển số
-                    if (!isPlateMatching(vehicle.getLicensePlate(), detectedPlate)) {
-                        // Từ chối nhưng không lưu Session (hoặc lưu session REJECT tùy logic)
-                        return Mono.just(CheckOutResponseDTO.builder()
-                                .licensePlate(detectedPlate)
-                                .checkOutAt(LocalDateTime.now())
-                                .status(CheckStatus.DENIED.name())
-                                .ownerName("Unknown") // Thêm trường này để tránh null pointer ở FE
-                                .build());
-                    }
+                    boolean isDaily = dbResult.isDailyTicket();
 
                     // Logic Thành công -> Update session hiện tại
                     // Lưu ý: Save DB cũng là blocking nên cần bọc lại
@@ -275,15 +329,50 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                         currentSession.setLicensePlateOut(detectedPlate);
                         currentSession.setStatus(ParkStatus.OUT.name());
 
+                        String expectedPlate = currentSession.getLicensePlateIn();
+                        if (expectedPlate == null && vehicle != null) {
+                            expectedPlate = vehicle.getLicensePlate();
+                        }
+                        if (expectedPlate == null) {
+                            expectedPlate = detectedPlate;
+                        }
+
+                        log.info("Session Plate: {} - AI Plate: {}", expectedPlate, detectedPlate);
+
+                        if (!isPlateMatching(expectedPlate, detectedPlate)) {
+                            return CheckOutResponseDTO.builder()
+                                    .licensePlate(detectedPlate)
+                                    .checkOutAt(now)
+                                    .status(CheckStatus.DENIED.name())
+                                    .ownerName("Unknown")
+                                    .cardType(card.getType())
+                                    .imageUrl(imageUrl)
+                                    .build();
+                        }
+
+                        Double fee = null;
+                        if (isDaily) {
+                            fee = calculateTotalFee(currentSession.getTimeIn() , currentSession.getTimeOut());
+                            currentSession.setFeeCalculated(fee);
+                        }
+
                         ParkingSession savedSession = parkingSessionRepository.save(currentSession);
 
+                        String licensePlateResp = isDaily
+                                ? detectedPlate
+                                : savedSession.getVehicle().getLicensePlate();
+                        String ownerName = isDaily
+                                ? "Daily ticket"
+                                : (vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : "Unknown");
+
                         return CheckOutResponseDTO.builder()
-                                .ownerName(vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : "Unknown")
+                                .ownerName(ownerName)
                                 .checkOutAt(savedSession.getTimeOut())
                                 .checkInAt(savedSession.getTimeIn())
-                                .licensePlate(savedSession.getVehicle().getLicensePlate())
+                                .licensePlate(licensePlateResp)
                                 .status(CheckStatus.OPEN.name())
                                 .cardType(card.getType())
+                                .feeCalculated(fee)
                                 .imageUrl(imageUrl)
                                 .build();
                     }).subscribeOn(Schedulers.boundedElastic());
