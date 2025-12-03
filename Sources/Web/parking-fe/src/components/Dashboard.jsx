@@ -135,6 +135,12 @@ export default function Dashboard() {
             >
               Xem lịch sử ra vào
             </button>
+            <button
+              onClick={() => navigate({ to: "/monitoring" })}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Giám sát
+            </button>
           </div>
         </div>
       </div>

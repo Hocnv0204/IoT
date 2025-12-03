@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Tag, Descriptions, Typography, Spin, Empty, Input } from 'antd';
-import { Video, Car, CreditCard, User, Clock, FileText, AlertCircle } from 'lucide-react';
+import { Video, Car, CreditCard, User, Clock, FileText, AlertCircle, LogIn, LogOut } from 'lucide-react';
 import { websocketService } from '../services/websocketService';
+import { parkingSessionService } from '../services/parkingSessionService';
 
 const { Title, Text } = Typography;
 
@@ -127,7 +128,7 @@ export default function MonitoringPage() {
 
         {/* ESP32 Connection Panel */}
         <Card className="shadow-sm border-l-4 border-l-orange-500">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                     <Text strong>ESP32 IP:</Text>
                     <Input 
@@ -149,6 +150,43 @@ export default function MonitoringPage() {
                     {esp32Connected ? 'Ngắt kết nối ESP32' : 'Kết nối ESP32'}
                 </button>
                 {esp32Connected && <Tag color="green">Đã kết nối Camera & RFID</Tag>}
+            </div>
+        </Card>
+
+        {/* Status Control Panel */}
+        <Card className="shadow-sm border-l-4 border-l-blue-500">
+            <div className="flex items-center gap-4 flex-wrap">
+                <Text strong className="text-lg">Điều khiển trạng thái:</Text>
+                <button 
+                    onClick={async () => {
+                        try {
+                            await parkingSessionService.setStatus("CHECKIN");
+                            alert("Đã set trạng thái: CHECKIN");
+                        } catch (e) {
+                            console.error(e);
+                            alert("Lỗi khi set trạng thái");
+                        }
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
+                >
+                    <LogIn size={18} />
+                    Check In
+                </button>
+                <button 
+                    onClick={async () => {
+                        try {
+                            await parkingSessionService.setStatus("CHECKOUT");
+                            alert("Đã set trạng thái: CHECKOUT");
+                        } catch (e) {
+                            console.error(e);
+                            alert("Lỗi khi set trạng thái");
+                        }
+                    }}
+                    className="px-4 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700 transition-colors flex items-center gap-2"
+                >
+                    <LogOut size={18} />
+                    Check Out
+                </button>
             </div>
         </Card>
 

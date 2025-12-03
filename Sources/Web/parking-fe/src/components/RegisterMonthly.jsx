@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { customerService } from "../services/customerService";
 import { vehicleService } from "../services/vehicleService";
 import { cardService } from "../services/cardService";
+import { parkingSessionService } from "../services/parkingSessionService";
 
 function SmallModal({ open, onClose, title, children }) {
   if (!open) return null;
@@ -268,12 +269,28 @@ export default function RegisterMonthly() {
         {/* Step 3 */}
         <div className="mb-6">
           <h3 className="font-medium">Bước 3: Nhập thông tin Thẻ</h3>
-          <input
-            value={uid}
-            onChange={(e) => setUid(e.target.value)}
-            placeholder="Nhập mã UID trên thẻ"
-            className="w-full border rounded-lg px-3 py-2 mt-3"
-          />
+          <div className="flex gap-2 mt-3">
+            <input
+              value={uid}
+              onChange={(e) => setUid(e.target.value)}
+              placeholder="Nhập mã UID trên thẻ"
+              className="flex-1 border rounded-lg px-3 py-2"
+            />
+            <button
+              onClick={async () => {
+                try {
+                  await parkingSessionService.setStatus("SCANNING");
+                  alert("Đã bắt đầu quét thẻ. Vui lòng đưa thẻ vào đầu đọc.");
+                } catch (e) {
+                  console.error(e);
+                  alert("Lỗi khi bắt đầu quét thẻ");
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Quét thẻ
+            </button>
+          </div>
         </div>
 
         {/* Step 4 */}

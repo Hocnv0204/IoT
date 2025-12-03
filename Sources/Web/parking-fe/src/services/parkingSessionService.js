@@ -33,6 +33,18 @@ export const parkingSessionService = {
     });
     return response.data.data;
   },
+
+  getStatus: async () => {
+    const response = await apiClient.get("/parking-session/status");
+    return response.data.data;
+  },
+
+  setStatus: async (status) => {
+    const response = await apiClient.post("/parking-session/status", null, {
+      params: { status },
+    });
+    return response.data;
+  },
 };
 
 export default parkingSessionService;
