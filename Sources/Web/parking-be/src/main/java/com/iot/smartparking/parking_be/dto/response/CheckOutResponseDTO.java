@@ -14,4 +14,5 @@ public class CheckOutResponseDTO {
     private LocalDateTime checkInAt ;
     private String imageUrl ;
     private String cardType ;
+    private Double feeCalculated;
 }
