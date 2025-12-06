@@ -9,6 +9,11 @@ export const cardService = {
     });
     return response.data.data;
   },
+
+  registerDaily: async (cardCode) => {
+    const response = await apiClient.post("/cards/register-daily", { rfid: cardCode });
+    return response.data.data;
+  },
 };
 
 export default cardService;

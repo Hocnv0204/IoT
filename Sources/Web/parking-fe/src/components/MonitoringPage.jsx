@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tag, Descriptions, Typography, Spin, Empty, Input } from 'antd';
-import { Video, Car, CreditCard, User, Clock, FileText, AlertCircle, LogIn, LogOut } from 'lucide-react';
+import { Card, Tag, Descriptions, Typography, Spin, Empty, Input, message } from 'antd';
+import { Video, Car, CreditCard, User, Clock, FileText, AlertCircle, LogIn, LogOut, CheckCircle, XCircle, AlertTriangle, Home } from 'lucide-react';
 import { websocketService } from '../services/websocketService';
 import { parkingSessionService } from '../services/parkingSessionService';
 
@@ -16,6 +16,7 @@ export default function MonitoringPage() {
   const [esp32Ip, setEsp32Ip] = useState('192.168.2.16'); // Default IP from user logs
   const [esp32Connected, setEsp32Connected] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
+  const [result, setResult] = useState(null); // { type: 'success' | 'error', title: '', message: '' }
 
   
   // Placeholder for video streams - in production these would be real MJPEG streams
@@ -25,10 +26,34 @@ export default function MonitoringPage() {
   useEffect(() => {
     const handleEvent = (data) => {
       console.log("New parking event:", data);
-      
+
       // Log specifically for ESP32 data
       if (data.rfid) {
         console.log("✅ [ESP32] Received RFID data from ESP32:", data.rfid);
+      }
+
+      // Handle "Not found card" error
+      if (data.message === "Not found card" || data.apiErrorResponse?.code === 404) {
+          const msg = "Thẻ chưa được đăng ký trong hệ thống";
+          message.error(msg);
+          setResult({
+              type: 'error',
+              title: 'Lỗi quẹt thẻ',
+              message: msg
+          });
+          
+          setCurrentEvent({
+              ...data,
+              status: "NOT_FOUND",
+              ownerName: "Chưa đăng ký",
+              licensePlate: "Unknown",
+              vehicleType: "Unknown"
+          });
+          
+          if (data.rfid) {
+            setScannedCardId(data.rfid);
+          }
+          return;
       }
 
       setCurrentEvent(data);
@@ -76,19 +101,21 @@ export default function MonitoringPage() {
             setEsp32Connected(true);
         },
         (data) => {
+
             if (data.type === 'CHECK_IN') {
                 console.log("✅ [ESP32] RFID Scanned:", data.rfid);
                 setScannedCardId(data.rfid);
                 // Optional: Send to backend if needed, but currently just displaying
             } else if (data.type === 'VIDEO_FRAME') {
                 // Create Blob from ArrayBuffer
-                const blob = new Blob([data.data], { type: 'image/jpeg' });
+                const blob = new Blob([data.buffer], { type: 'image/jpeg' });
                 const url = URL.createObjectURL(blob);
                 setVideoUrl((prev) => {
                     if (prev) URL.revokeObjectURL(prev); // Clean up old URL
                     return url;
                 });
             }
+
         },
         () => {
             console.log("❌ [ESP32] Disconnected");
@@ -121,6 +148,13 @@ export default function MonitoringPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.location.href = '/dashboard'}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors mr-2"
+              title="Về trang chủ"
+            >
+              <Home size={24} className="text-gray-600" />
+            </button>
             <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
             <Text strong>{connected ? 'Hệ thống Online' : 'Mất kết nối'}</Text>
           </div>
@@ -153,6 +187,33 @@ export default function MonitoringPage() {
             </div>
         </Card>
 
+        {/* Custom Notification Area */}
+        {result && (
+          <div className={`p-4 rounded-xl shadow-sm border-l-4 flex items-start gap-4 transition-all duration-500 animate-in fade-in slide-in-from-top-4 ${
+            result.type === 'success' 
+              ? 'bg-green-50 border-green-500 text-green-800' 
+              : 'bg-red-50 border-red-500 text-red-800'
+          }`}>
+            <div className={`p-2 rounded-full ${
+              result.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+            }`}>
+              {result.type === 'success' ? <CheckCircle size={24} className="text-green-600"/> : <AlertTriangle size={24} className="text-red-600"/>}
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-lg mb-1">{result.title}</h4>
+              <p className="opacity-90">{result.message}</p>
+            </div>
+            <button 
+              onClick={() => setResult(null)}
+              className={`p-1 rounded hover:bg-black/5 transition-colors ${
+                result.type === 'success' ? 'text-green-600' : 'text-red-600'
+              }`}
+            >
+              <XCircle size={20} />
+            </button>
+          </div>
+        )}
+
         {/* Status Control Panel */}
         <Card className="shadow-sm border-l-4 border-l-blue-500">
             <div className="flex items-center gap-4 flex-wrap">
@@ -160,11 +221,23 @@ export default function MonitoringPage() {
                 <button 
                     onClick={async () => {
                         try {
-                            await parkingSessionService.setStatus("CHECKIN");
-                            alert("Đã set trạng thái: CHECKIN");
+                            const res = await parkingSessionService.setStatus("CHECKIN");
+                            const msg = res.message || "Đã chuyển trạng thái: CHECKIN";
+                            message.success(msg);
+                            setResult({ 
+                                type: 'success', 
+                                title: 'Chuyển trạng thái thành công',
+                                message: msg 
+                            });
                         } catch (e) {
                             console.error(e);
-                            alert("Lỗi khi set trạng thái");
+                            const errorMsg = e.response?.data?.message || "Lỗi khi set trạng thái";
+                            message.error(errorMsg);
+                            setResult({ 
+                                type: 'error', 
+                                title: 'Lỗi chuyển trạng thái',
+                                message: errorMsg 
+                            });
                         }
                     }}
                     className="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -175,11 +248,23 @@ export default function MonitoringPage() {
                 <button 
                     onClick={async () => {
                         try {
-                            await parkingSessionService.setStatus("CHECKOUT");
-                            alert("Đã set trạng thái: CHECKOUT");
+                            const res = await parkingSessionService.setStatus("CHECKOUT");
+                            const msg = res.message || "Đã chuyển trạng thái: CHECKOUT";
+                            message.success(msg);
+                            setResult({ 
+                                type: 'success', 
+                                title: 'Chuyển trạng thái thành công',
+                                message: msg 
+                            });
                         } catch (e) {
                             console.error(e);
-                            alert("Lỗi khi set trạng thái");
+                            const errorMsg = e.response?.data?.message || "Lỗi khi set trạng thái";
+                            message.error(errorMsg);
+                            setResult({ 
+                                type: 'error', 
+                                title: 'Lỗi chuyển trạng thái',
+                                message: errorMsg 
+                            });
                         }
                     }}
                     className="px-4 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700 transition-colors flex items-center gap-2"
@@ -274,6 +359,14 @@ export default function MonitoringPage() {
                <Car className="w-16 h-16 mx-auto mb-4 opacity-20" />
                <Text className="text-lg">Chờ quẹt thẻ...</Text>
                <p className="text-sm mt-2">Thông tin xe sẽ hiển thị tại đây khi có lượt ra/vào</p>
+             </div>
+          ) : (currentEvent.status === "NOT_FOUND") ? (
+             <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-6">
+                  <User className="w-10 h-10 text-gray-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-600 mb-2">THẺ CHƯA ĐƯỢC ĐĂNG KÝ</h3>
+                <p className="text-gray-500 text-lg">Vui lòng đăng ký thẻ trước khi sử dụng.</p>
              </div>
           ) : (currentEvent.status === "DENIED") ? (
             <div className="text-center py-12">

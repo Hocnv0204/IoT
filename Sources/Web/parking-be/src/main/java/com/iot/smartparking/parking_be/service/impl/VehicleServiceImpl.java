@@ -89,6 +89,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .type(request.getType())
                 .brand(request.getBrand())
                 .color(request.getColor())
+                .card(null)
                 .customer(customer)
                 .status("ACTIVE")
                 .build();
