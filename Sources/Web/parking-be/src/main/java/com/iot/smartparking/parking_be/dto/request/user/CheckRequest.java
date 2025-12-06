@@ -5,5 +5,5 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Data
 public class CheckRequest {
-    private String rfidCard ;
+    private String rfid ;
 }

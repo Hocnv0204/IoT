@@ -1,6 +1,8 @@
 package com.iot.smartparking.parking_be.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iot.smartparking.parking_be.configuration.Base64DecodedMultipartFile;
+import com.iot.smartparking.parking_be.dto.request.Esp32Request;
 import com.iot.smartparking.parking_be.dto.request.admin.LogRequest;
 import com.iot.smartparking.parking_be.dto.request.user.CheckRequest;
 import com.iot.smartparking.parking_be.dto.response.ApiResponse;
@@ -28,13 +30,8 @@ public class ParkingSessionController {
             @RequestPart("image")MultipartFile image,
             @RequestPart("rfid") String rfidCard
             ){
-        ObjectMapper objectMapper = new ObjectMapper() ;
-        CheckRequest checkRequest = null ;
-        try{
-            checkRequest = objectMapper.readValue(rfidCard , CheckRequest.class);
-        }catch (Exception e){
-            throw  new RuntimeException("Invalid request body") ;
-        }
+        CheckRequest checkRequest = new CheckRequest();
+        checkRequest.setRfid(rfidCard);
         return parkingSessionService.checkIn(checkRequest , image).map(
                 response -> ResponseEntity.ok()
                         .body(
@@ -100,6 +97,38 @@ public class ParkingSessionController {
                                         .build()
                         )
         ) ;
+    }
+    @PostMapping("/checkin-json")
+    public Mono<ResponseEntity<ApiResponse<?>>> checkinJson(@RequestBody Esp32Request request) {
+        try {
+            // Xử lý Base64
+            String base64Image = request.getImage();
+            if (base64Image.contains(",")) {
+                base64Image = base64Image.split(",")[1];
+            }
+
+            byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Image);
+
+            MultipartFile multipartFile =
+                    new Base64DecodedMultipartFile(imageBytes, "esp32-" + System.currentTimeMillis() + ".jpg");
+
+            CheckRequest checkRequest = new CheckRequest();
+            checkRequest.setRfid(request.getRfid());
+
+            return parkingSessionService.checkIn(checkRequest, multipartFile)
+                    .map(response -> ResponseEntity.ok(
+                            ApiResponse.builder()
+                                    .data(response)
+                                    .message("Checkin successfully")
+                                    .build()
+                    ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(ApiResponse.builder()
+                            .message("Checkin failed: " + e.getMessage())
+                            .build()));
+        }
     }
 
 }

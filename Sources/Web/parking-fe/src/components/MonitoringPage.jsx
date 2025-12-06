@@ -13,7 +13,7 @@ export default function MonitoringPage() {
   const [scannedCardId, setScannedCardId] = useState('');
   
   // ESP32 Integration State
-  const [esp32Ip, setEsp32Ip] = useState('10.1.0.45'); // Default IP from user logs
+  const [esp32Ip, setEsp32Ip] = useState('192.168.2.16'); // Default IP from user logs
   const [esp32Connected, setEsp32Connected] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
 

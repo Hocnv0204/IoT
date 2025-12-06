@@ -64,7 +64,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     @Transactional
     @Override
     public Mono<CheckInResponseDTO> checkIn(CheckRequest request , MultipartFile image ){
-        String rfidUid = request.getRfidCard();
+        String rfidUid = request.getRfid();
         Mono<DbResult> dbTask = Mono.fromCallable(() -> {
             // Tìm thẻ
             RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid)
@@ -263,7 +263,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
     @Override
     public Mono<CheckOutResponseDTO> checkOut(CheckRequest request , MultipartFile image ){
-        String rfidUid = request.getRfidCard();
+        String rfidUid = request.getRfid();
         Mono<DbResult> dbTask = Mono.fromCallable(() -> {
             // Tìm thẻ
             RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid)
