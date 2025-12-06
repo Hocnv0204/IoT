@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { message, Tag } from "antd";
+import { CheckCircle, XCircle, AlertTriangle, Wifi, WifiOff, Home } from 'lucide-react';
 import { customerService } from "../services/customerService";
 import { vehicleService } from "../services/vehicleService";
 import { cardService } from "../services/cardService";
 import { parkingSessionService } from "../services/parkingSessionService";
+import { websocketService } from "../services/websocketService";
 
 function SmallModal({ open, onClose, title, children }) {
   if (!open) return null;
@@ -22,6 +25,10 @@ function SmallModal({ open, onClose, title, children }) {
 }
 
 export default function RegisterMonthly() {
+  // ESP32 State
+  const [esp32Ip, setEsp32Ip] = useState('192.168.2.16');
+  const [esp32Connected, setEsp32Connected] = useState(false);
+
   // Step 1 - customer
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -98,9 +105,10 @@ export default function RegisterMonthly() {
       setShowNewCustomerModal(false);
       setQuery("");
       setSuggestions([]);
+      message.success("Thêm khách hàng thành công");
     } catch (e) {
       console.error(e);
-      alert("Lỗi tạo khách hàng");
+      message.error("Lỗi tạo khách hàng");
     }
   };
 
@@ -108,28 +116,43 @@ export default function RegisterMonthly() {
   const createVehicle = async () => {
     if (!newVehicle.licensePlate || !selectedCustomer) return;
     try {
-      const payload = { ...newVehicle, customerId: selectedCustomer.id };
+      const payload = { 
+        ...newVehicle, 
+        vehicleType: newVehicle.type,
+        customerId: selectedCustomer.id 
+      };
       const created = await vehicleService.create(payload);
       setSelectedVehicle(created);
       setShowNewVehicleModal(false);
       setPlateQuery("");
       setVehicleSuggestions([]);
+      message.success("Thêm xe thành công");
     } catch (e) {
       console.error(e);
-      alert("Lỗi tạo xe");
+      message.error("Lỗi tạo xe");
     }
   };
 
   const assignCard = async () => {
-    if (!selectedVehicle) return alert("Chưa chọn xe");
-    if (!uid) return alert("Vui lòng nhập mã UID");
+    if (!selectedVehicle) return message.warning("Chưa chọn xe");
+    if (!uid) return message.warning("Vui lòng nhập mã UID");
+    
+    setResult(null);
     try {
       const resp = await cardService.assign({
         vehicleId: selectedVehicle.id,
         cardCode: uid,
         monthsDuration: Number(months),
       });
-      alert("Đăng ký thẻ thành công");
+      
+      const msg = "Đăng ký thẻ tháng thành công";
+      message.success(msg);
+      setResult({ 
+          type: 'success', 
+          title: 'Đăng ký thành công',
+          message: msg 
+      });
+
       // Reset
       setSelectedCustomer(null);
       setSelectedVehicle(null);
@@ -137,14 +160,139 @@ export default function RegisterMonthly() {
       setMonths(1);
     } catch (e) {
       console.error(e);
-      alert("Lỗi khi đăng ký thẻ");
+      const errorMsg = e.response?.data?.message || "Lỗi khi đăng ký thẻ";
+      message.error(errorMsg);
+      setResult({ 
+          type: 'error', 
+          title: 'Đăng ký thất bại',
+          message: errorMsg 
+      });
     }
+  };
+
+  const [result, setResult] = useState(null); // { type: 'success' | 'error', title: '', message: '' }
+
+  // ESP32 Connection Logic
+  useEffect(() => {
+    return () => {
+      websocketService.disconnectEsp32();
+    };
+  }, []);
+
+  const handleConnectEsp32 = () => {
+    if (esp32Connected) {
+      websocketService.disconnectEsp32();
+      setEsp32Connected(false);
+      return;
+    }
+
+    websocketService.connectToEsp32(
+      esp32Ip,
+      () => {
+        message.success("Đã kết nối với thiết bị ESP32");
+        setEsp32Connected(true);
+      },
+      (data) => {
+        if (data?.type === "RFID_SCANNED" && data?.rfid) {
+          setUid(data.rfid);
+          message.info(`Đã quét thẻ: ${data.rfid}`);
+          return;
+        }
+
+        try {
+          const json = JSON.parse(data);
+          if (json.rfid || json.cardId) {
+            const rfid = json.rfid || json.cardId;
+            setUid(rfid);
+            message.info(`Đã quét thẻ: ${rfid}`);
+            return;
+          }
+        } catch (e) {
+          if (typeof data === "string" && data.trim().length >= 8) {
+            setUid(data.trim());
+            message.info(`Đã quét thẻ: ${data}`);
+          }
+        }
+      },
+      () => {
+        message.warning("Đã ngắt kết nối ESP32");
+        setEsp32Connected(false);
+      }
+    );
   };
 
   return (
     <div className="min-h-screen p-8 bg-gray-50">
       <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow">
-        <h2 className="text-2xl font-semibold mb-4">Đăng ký vé tháng</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">Đăng ký vé tháng</h2>
+          <button
+            onClick={() => window.location.href = '/dashboard'}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            title="Về trang chủ"
+          >
+            <Home size={24} className="text-gray-600" />
+          </button>
+        </div>
+
+        {/* Custom Notification Area */}
+        {result && (
+          <div className={`mb-6 p-4 rounded-xl shadow-sm border-l-4 flex items-start gap-4 transition-all duration-500 animate-in fade-in slide-in-from-top-4 ${
+            result.type === 'success' 
+              ? 'bg-green-50 border-green-500 text-green-800' 
+              : 'bg-red-50 border-red-500 text-red-800'
+          }`}>
+            <div className={`p-2 rounded-full ${
+              result.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+            }`}>
+              {result.type === 'success' ? <CheckCircle size={24} className="text-green-600"/> : <AlertTriangle size={24} className="text-red-600"/>}
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-lg mb-1">{result.title}</h4>
+              <p className="opacity-90">{result.message}</p>
+            </div>
+            <button 
+              onClick={() => setResult(null)}
+              className={`p-1 rounded hover:bg-black/5 transition-colors ${
+                result.type === 'success' ? 'text-green-600' : 'text-red-600'
+              }`}
+            >
+              <XCircle size={20} />
+            </button>
+          </div>
+        )}
+
+        {/* ESP32 Connection Panel */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Wifi className={esp32Connected ? "text-green-500" : "text-gray-400"} />
+                <span className="font-semibold">Kết nối thiết bị đọc thẻ (ESP32)</span>
+              </div>
+              <Tag color={esp32Connected ? "green" : "red"}>
+                {esp32Connected ? "Đã kết nối" : "Chưa kết nối"}
+              </Tag>
+            </div>
+
+            <div className="flex gap-2">
+              <input 
+                value={esp32Ip}
+                onChange={(e) => setEsp32Ip(e.target.value)}
+                placeholder="Nhập IP ESP32 (VD: 192.168.1.x)"
+                className="border rounded px-3 py-2 w-48"
+                disabled={esp32Connected}
+              />
+              <button 
+                onClick={handleConnectEsp32}
+                className={`px-4 py-2 rounded flex items-center gap-2 text-white ${
+                    esp32Connected ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {esp32Connected ? <WifiOff size={16}/> : <Wifi size={16}/>}
+                {esp32Connected ? "Ngắt kết nối" : "Kết nối"}
+              </button>
+            </div>
+        </div>
 
         {/* Step 1 */}
         <div className="mb-6">
@@ -269,27 +417,46 @@ export default function RegisterMonthly() {
         {/* Step 3 */}
         <div className="mb-6">
           <h3 className="font-medium">Bước 3: Nhập thông tin Thẻ</h3>
-          <div className="flex gap-2 mt-3">
+          
+          <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between">
+             <span className="text-sm text-purple-800">
+               * Chuyển hệ thống sang chế độ ĐĂNG KÝ để nhận mã thẻ từ ESP32
+             </span>
+             <button
+                onClick={async () => {
+                    try {
+                        const res = await parkingSessionService.setStatus("REGISTER");
+                        const msg = res.message || "Đã chuyển sang chế độ ĐĂNG KÝ";
+                        message.success(msg);
+                        setResult({ 
+                            type: 'success', 
+                            title: 'Chuyển chế độ thành công',
+                            message: msg 
+                        });
+                    } catch (e) {
+                        console.error(e);
+                        const errorMsg = e.response?.data?.message || "Lỗi khi chuyển chế độ";
+                        message.error(errorMsg);
+                        setResult({ 
+                            type: 'error', 
+                            title: 'Lỗi chuyển chế độ',
+                            message: errorMsg 
+                        });
+                    }
+                }}
+                className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+              >
+                Bật chế độ Đăng ký
+              </button>
+          </div>
+
+          <div className="mt-3">
             <input
               value={uid}
               onChange={(e) => setUid(e.target.value)}
               placeholder="Nhập mã UID trên thẻ"
-              className="flex-1 border rounded-lg px-3 py-2"
+              className="w-full border rounded-lg px-3 py-2"
             />
-            <button
-              onClick={async () => {
-                try {
-                  await parkingSessionService.setStatus("SCANNING");
-                  alert("Đã bắt đầu quét thẻ. Vui lòng đưa thẻ vào đầu đọc.");
-                } catch (e) {
-                  console.error(e);
-                  alert("Lỗi khi bắt đầu quét thẻ");
-                }
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Quét thẻ
-            </button>
           </div>
         </div>
 

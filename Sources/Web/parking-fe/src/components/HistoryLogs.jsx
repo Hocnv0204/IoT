@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { DatePicker, Select, Input, Table, Tag } from "antd";
+import { Home } from "lucide-react";
 import { authService } from "../services/authService";
 import { parkingSessionService } from "../services/parkingSessionService";
 
@@ -123,9 +124,10 @@ export default function HistoryLogs() {
           </div>
           <button
             onClick={() => navigate({ to: "/dashboard" })}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+            title="Về trang chủ"
           >
-            Quay về Dashboard
+            <Home size={24} className="text-gray-600" />
           </button>
         </div>
 

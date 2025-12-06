@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterMonthlyRouteImport } from './routes/register-monthly'
+import { Route as RegisterDailyRouteImport } from './routes/register-daily'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as LoginRouteImport } from './routes/login'
@@ -19,6 +20,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const RegisterMonthlyRoute = RegisterMonthlyRouteImport.update({
   id: '/register-monthly',
   path: '/register-monthly',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterDailyRoute = RegisterDailyRouteImport.update({
+  id: '/register-daily',
+  path: '/register-daily',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MonitoringRoute = MonitoringRouteImport.update({
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
   '/monitoring': typeof MonitoringRoute
+  '/register-daily': typeof RegisterDailyRoute
   '/register-monthly': typeof RegisterMonthlyRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
   '/monitoring': typeof MonitoringRoute
+  '/register-daily': typeof RegisterDailyRoute
   '/register-monthly': typeof RegisterMonthlyRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
   '/monitoring': typeof MonitoringRoute
+  '/register-daily': typeof RegisterDailyRoute
   '/register-monthly': typeof RegisterMonthlyRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/logs'
     | '/monitoring'
+    | '/register-daily'
     | '/register-monthly'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/logs'
     | '/monitoring'
+    | '/register-daily'
     | '/register-monthly'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/logs'
     | '/monitoring'
+    | '/register-daily'
     | '/register-monthly'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   LogsRoute: typeof LogsRoute
   MonitoringRoute: typeof MonitoringRoute
+  RegisterDailyRoute: typeof RegisterDailyRoute
   RegisterMonthlyRoute: typeof RegisterMonthlyRoute
 }
 
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/register-monthly'
       fullPath: '/register-monthly'
       preLoaderRoute: typeof RegisterMonthlyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register-daily': {
+      id: '/register-daily'
+      path: '/register-daily'
+      fullPath: '/register-daily'
+      preLoaderRoute: typeof RegisterDailyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/monitoring': {
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   LogsRoute: LogsRoute,
   MonitoringRoute: MonitoringRoute,
+  RegisterDailyRoute: RegisterDailyRoute,
   RegisterMonthlyRoute: RegisterMonthlyRoute,
 }
 export const routeTree = rootRouteImport

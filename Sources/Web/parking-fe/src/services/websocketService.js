@@ -117,19 +117,31 @@ class WebSocketService {
     };
 
     this.esp32Socket.onmessage = (event) => {
-      if (typeof event.data === "string") {
-        // Text data (JSON) - RFID
-        try {
-            const data = JSON.parse(event.data);
-            if (onMessage) onMessage(data);
-        } catch (e) {
-            console.error("[ESP32] JSON Parse Error:", e);
-        }
-      } else {
-        // Binary data - Video Frame
-        if (onMessage) onMessage({ type: 'VIDEO_FRAME', data: event.data });
-      }
-    };
+
+
+  if (typeof event.data === "string") {
+    // Nếu là chuỗi UID (>= 8 hex)
+    if (/^[0-9A-Fa-f]{8,}$/.test(event.data)) {
+      if (onMessage) onMessage({ type: "RFID_SCANNED", rfid: event.data });
+      return;
+    }
+
+    // Nếu là JSON
+    try {
+      const data = JSON.parse(event.data);
+      if (onMessage) onMessage(data);
+      return;
+    } catch (_) {
+      console.warn("[ESP32] Unknown text:", event.data);
+    }
+  }
+
+  // Binary frame (camera)
+  if (event.data instanceof ArrayBuffer) {
+    if (onMessage) onMessage({ type: "VIDEO_FRAME", buffer: event.data });
+  }
+};
+
 
     this.esp32Socket.onclose = () => {
       console.log("[ESP32] Disconnected");

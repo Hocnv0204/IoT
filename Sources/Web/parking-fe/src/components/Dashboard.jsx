@@ -130,6 +130,12 @@ export default function Dashboard() {
               Đăng ký vé tháng
             </button>
             <button
+              onClick={() => navigate({ to: "/register-daily" })}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Đăng ký vé ngày
+            </button>
+            <button
               onClick={() => navigate({ to: "/logs" })}
               className="px-4 py-2 bg-white border border-gray-300 text-gray-800 rounded hover:bg-gray-50"
             >

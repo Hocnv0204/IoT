@@ -1,9 +1,11 @@
 package com.iot.smartparking.parking_be.controller;
 
+import com.cloudinary.Api;
 import com.iot.smartparking.parking_be.common.CardStatus;
 import com.iot.smartparking.parking_be.common.CardType;
 import com.iot.smartparking.parking_be.dto.PageResponse;
 import com.iot.smartparking.parking_be.dto.request.admin.AssignCardRequest;
+import com.iot.smartparking.parking_be.dto.request.admin.RegisterDailyCardRequest;
 import com.iot.smartparking.parking_be.dto.response.ApiResponse;
 import com.iot.smartparking.parking_be.exception.AppException;
 import com.iot.smartparking.parking_be.exception.ErrorCode;
@@ -12,6 +14,7 @@ import com.iot.smartparking.parking_be.model.Vehicle;
 import com.iot.smartparking.parking_be.repository.CardRepository;
 import com.iot.smartparking.parking_be.repository.VehicleRepository;
 import com.iot.smartparking.parking_be.mapper.VehicleMapper;
+import com.iot.smartparking.parking_be.service.CardService;
 import com.iot.smartparking.parking_be.utils.PageableUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,7 +31,7 @@ public class CardsController {
     private final CardRepository cardRepository;
     private final VehicleRepository vehicleRepository;
     private final VehicleMapper vehicleMapper;
-
+    private final CardService cardService ;
     @PostMapping("/assign")
     public ResponseEntity<ApiResponse<?>> assignCard(@RequestBody AssignCardRequest request){
         if(request.getVehicleId() == null || request.getCardCode() == null || request.getMonthsDuration() == null){
@@ -105,5 +108,13 @@ public class CardsController {
                         .build()
         );
     }
-
+    @PostMapping("/register-daily")
+    public ResponseEntity<ApiResponse<?>> registerDailyCard(@RequestBody RegisterDailyCardRequest request){
+        return ResponseEntity.ok().body(
+                ApiResponse.builder()
+                        .data(cardService.registerDailyCard(request))
+                        .message("Register daily card successfully")
+                        .build()
+        ) ;
+    }
 }

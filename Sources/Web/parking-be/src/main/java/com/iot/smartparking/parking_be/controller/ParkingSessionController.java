@@ -2,12 +2,15 @@ package com.iot.smartparking.parking_be.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iot.smartparking.parking_be.configuration.Base64DecodedMultipartFile;
+import com.iot.smartparking.parking_be.configuration.ParkingStateContext;
 import com.iot.smartparking.parking_be.dto.request.Esp32Request;
 import com.iot.smartparking.parking_be.dto.request.admin.LogRequest;
+import com.iot.smartparking.parking_be.dto.request.admin.RegisterDailyCardRequest;
 import com.iot.smartparking.parking_be.dto.request.user.CheckRequest;
 import com.iot.smartparking.parking_be.dto.response.ApiResponse;
 import com.iot.smartparking.parking_be.dto.response.StatisticsResponse;
 import com.iot.smartparking.parking_be.model.ParkingSession;
+import com.iot.smartparking.parking_be.service.CardService;
 import com.iot.smartparking.parking_be.service.ParkingSessionService;
 import com.iot.smartparking.parking_be.utils.PageableUtils;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +28,63 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ParkingSessionController {
     private final ParkingSessionService parkingSessionService ;
+    private final ParkingStateContext stateContext;
+    @PostMapping("/status")
+    public ResponseEntity<ApiResponse<?>> setStatus(@RequestParam String status) {
+        if (!status.matches("(?i)CHECKIN|CHECKOUT|REGISTER")) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.builder()
+                            .message("Invalid status")
+                            .build());
+        }
+
+        stateContext.setCurrentStatus(status);
+
+        return ResponseEntity.ok(
+                ApiResponse.builder()
+                        .message("Status updated to " + status)
+                        .build()
+        );
+    }
+    @PostMapping(value = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Mono<ResponseEntity<ApiResponse<?>>> scan(
+            @RequestPart("image") MultipartFile image,
+            @RequestPart("rfid") String rfidCard
+    ) {
+        String status = stateContext.getCurrentStatus();
+        CheckRequest request = new CheckRequest();
+        request.setRfid(rfidCard);
+
+        Mono<?> result;
+
+        switch (status) {
+            case "CHECKIN":
+                result = parkingSessionService.checkIn(request, image);
+                break;
+            case "CHECKOUT":
+                result = parkingSessionService.checkOut(request, image);
+                break;
+            case "REGISTER":
+                // Không làm gì cả
+                return Mono.just(ResponseEntity.ok(
+                        ApiResponse.builder()
+                                .message("System in REGISTER mode, no action taken")
+                                .build()
+                ));
+            default:
+                return Mono.just(ResponseEntity.badRequest()
+                        .body(ApiResponse.builder().message("Unknown status").build()));
+        }
+
+        return result.map(response -> ResponseEntity.ok(
+                ApiResponse.builder()
+                        .data(response)
+                        .message(status + " successfully")
+                        .build()
+        ));
+    }
+
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE , path = "/checkin")
     public Mono<ResponseEntity<ApiResponse<?>>> checkin(
             @RequestPart("image")MultipartFile image,
@@ -130,5 +190,6 @@ public class ParkingSessionController {
                             .build()));
         }
     }
+
 
 }
