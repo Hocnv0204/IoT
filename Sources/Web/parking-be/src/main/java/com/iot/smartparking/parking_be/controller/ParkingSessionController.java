@@ -9,11 +9,15 @@ import com.iot.smartparking.parking_be.dto.request.admin.RegisterDailyCardReques
 import com.iot.smartparking.parking_be.dto.request.user.CheckRequest;
 import com.iot.smartparking.parking_be.dto.response.ApiResponse;
 import com.iot.smartparking.parking_be.dto.response.StatisticsResponse;
+
 import com.iot.smartparking.parking_be.model.ParkingSession;
 import com.iot.smartparking.parking_be.service.CardService;
+
+
 import com.iot.smartparking.parking_be.service.ParkingSessionService;
 import com.iot.smartparking.parking_be.utils.PageableUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,8 +30,10 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/parking-session")
 @RequiredArgsConstructor
+@Slf4j
 public class ParkingSessionController {
     private final ParkingSessionService parkingSessionService ;
+
     private final ParkingStateContext stateContext;
     @PostMapping("/status")
     public ResponseEntity<ApiResponse<?>> setStatus(@RequestParam String status) {
@@ -83,6 +89,7 @@ public class ParkingSessionController {
                         .build()
         ));
     }
+
 
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE , path = "/checkin")
@@ -190,6 +197,7 @@ public class ParkingSessionController {
                             .build()));
         }
     }
+
 
 
 }
