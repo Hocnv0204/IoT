@@ -34,4 +34,4 @@ build/
 
 ### Uploaded Images ###
 ./src/main/resources/image
-./images/iot
+./images/iot/
