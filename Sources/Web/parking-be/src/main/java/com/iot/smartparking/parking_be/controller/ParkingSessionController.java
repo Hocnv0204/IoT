@@ -5,10 +5,10 @@ import com.iot.smartparking.parking_be.dto.request.admin.LogRequest;
 import com.iot.smartparking.parking_be.dto.request.user.CheckRequest;
 import com.iot.smartparking.parking_be.dto.response.ApiResponse;
 import com.iot.smartparking.parking_be.dto.response.StatisticsResponse;
-import com.iot.smartparking.parking_be.model.ParkingSession;
 import com.iot.smartparking.parking_be.service.ParkingSessionService;
 import com.iot.smartparking.parking_be.utils.PageableUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +21,13 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/parking-session")
 @RequiredArgsConstructor
+@Slf4j
 public class ParkingSessionController {
     private final ParkingSessionService parkingSessionService ;
+    
+    // Trạng thái hiện tại của hệ thống
+    // Có thể là: "IDLE", "SCANNING", "CHECKIN", "CHECKOUT", etc.
+    private volatile String currentStatus = "IDLE";
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE , path = "/checkin")
     public Mono<ResponseEntity<ApiResponse<?>>> checkin(
             @RequestPart("image")MultipartFile image,
@@ -100,6 +105,36 @@ public class ParkingSessionController {
                                         .build()
                         )
         ) ;
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<ApiResponse<String>> getStatus() {
+        return ResponseEntity.ok()
+                .body(
+                        ApiResponse.<String>builder()
+                                .data(currentStatus)
+                                .message("Lấy trạng thái hiện tại thành công")
+                                .build()
+                );
+    }
+
+    @PostMapping("/status")
+    public ResponseEntity<ApiResponse<String>> setStatus(@RequestParam(required = false) String status) {
+        String previousStatus = currentStatus;
+        if (status != null && !status.isEmpty()) {
+            currentStatus = status;
+        } else {
+            // Nếu không có status, reset về IDLE
+            currentStatus = "IDLE";
+        }
+        log.info("Trạng thái hệ thống đã được cập nhật: {} -> {}", previousStatus, currentStatus);
+        return ResponseEntity.ok()
+                .body(
+                        ApiResponse.<String>builder()
+                                .data(currentStatus)
+                                .message("Đã cập nhật trạng thái thành: " + currentStatus)
+                                .build()
+                );
     }
 
 }
