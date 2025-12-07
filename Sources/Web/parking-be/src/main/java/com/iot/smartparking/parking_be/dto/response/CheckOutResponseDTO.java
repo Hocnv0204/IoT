@@ -13,6 +13,7 @@ public class CheckOutResponseDTO {
     private LocalDateTime checkOutAt ;
     private LocalDateTime checkInAt ;
     private String imageUrl ;
+    private String checkInImageUrl;
     private String cardType ;
     private Double feeCalculated;
 }

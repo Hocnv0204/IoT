@@ -17,11 +17,12 @@ export default function MonitoringPage() {
   const [esp32Connected, setEsp32Connected] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   const [result, setResult] = useState(null); // { type: 'success' | 'error', title: '', message: '' }
+  const [activeStreamTarget, setActiveStreamTarget] = useState('ENTRY'); // 'ENTRY' or 'EXIT'
 
   
   // Placeholder for video streams - in production these would be real MJPEG streams
   const entryCameraUrl = "https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=1000&auto=format&fit=crop"; 
-  const exitCameraUrl = "https://images.unsplash.com/photo-1590674899505-1c5c41951f89?q=80&w=1000&auto=format&fit=crop";
+  const exitCameraUrl = "https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=1000&auto=format&fit=crop";
 
   useEffect(() => {
     const handleEvent = (data) => {
@@ -35,12 +36,17 @@ export default function MonitoringPage() {
       // Handle "Not found card" error
       if (data.message === "Not found card" || data.apiErrorResponse?.code === 404) {
           const msg = "Thẻ chưa được đăng ký trong hệ thống";
-          message.error(msg);
+          message.error(msg, 5);
           setResult({
               type: 'error',
               title: 'Lỗi quẹt thẻ',
               message: msg
           });
+          
+          // Auto dismiss result after 5s
+          setTimeout(() => {
+            setResult(prev => (prev && prev.message === msg ? null : prev));
+          }, 5000);
           
           setCurrentEvent({
               ...data,
@@ -54,6 +60,100 @@ export default function MonitoringPage() {
             setScannedCardId(data.rfid);
           }
           return;
+      }
+
+      // Handle "Vehicle already in park" error (409)
+      if (data.message === "Vehicle already in park" || data.apiErrorResponse?.code === 409) {
+          const msg = "Xe đã ở trong bãi! Không thể check-in lại.";
+          message.error(msg, 5);
+          setResult({
+              type: 'error',
+              title: 'Lỗi Check-in',
+              message: msg
+          });
+
+          // Auto dismiss result after 5s
+          setTimeout(() => {
+            setResult(prev => (prev && prev.message === msg ? null : prev));
+          }, 5000);
+          
+          setCurrentEvent({
+              ...data,
+              status: "ALREADY_IN_PARK",
+          });
+          
+          if (data.rfid) {
+            setScannedCardId(data.rfid);
+          }
+          return;
+      }
+
+      // Handle "Vehicle already out park" error (409)
+      if (data.message === "Vehicle already out park") {
+          const msg = "Xe không có trong bãi! Không thể check-out.";
+          message.error(msg, 5);
+          setResult({
+              type: 'error',
+              title: 'Lỗi Check-out',
+              message: msg
+          });
+
+          // Auto dismiss result after 5s
+          setTimeout(() => {
+            setResult(prev => (prev && prev.message === msg ? null : prev));
+          }, 5000);
+          
+          setCurrentEvent({
+              ...data,
+              status: "ALREADY_OUT_PARK",
+          });
+          
+          if (data.rfid) {
+            setScannedCardId(data.rfid);
+          }
+          return;
+      }
+
+      // Handle WebSocket Error Notifications
+      if (data.type === 'ERROR_NOTIFICATION') {
+        console.log("❌ [WebSocket] Error Notification:", data);
+        
+        let errorMsg = data.errorMessage || data.message || "Có lỗi xảy ra";
+        let errorTitle = `Lỗi ${data.errorCode || data.apiErrorResponse?.code || 'Hệ thống'}`;
+
+        // Localize specific errors
+        if (errorMsg === "Not found card" || data.apiErrorResponse?.code === 404) {
+             errorMsg = "Thẻ chưa được đăng ký trong hệ thống";
+             errorTitle = "Lỗi quẹt thẻ";
+        }
+        
+        if (errorMsg === "Vehicle already in park") {
+             errorMsg = "Xe đã ở trong bãi! Không thể check-in lại.";
+             errorTitle = "Lỗi Check-in";
+        }
+        
+        if (errorMsg === "Vehicle already out park") {
+             errorMsg = "Xe không có trong bãi! Không thể check-out.";
+             errorTitle = "Lỗi Check-out";
+        }
+
+        message.error(errorMsg, 5);
+        
+        setResult({
+          type: 'error',
+          title: errorTitle,
+          message: errorMsg
+        });
+
+        // Auto dismiss result after 5s
+        setTimeout(() => {
+            setResult(prev => (prev && prev.message === errorMsg ? null : prev));
+        }, 5000);
+
+        if (data.rfid) {
+          setScannedCardId(data.rfid);
+        }
+        return;
       }
 
       setCurrentEvent(data);
@@ -220,6 +320,7 @@ export default function MonitoringPage() {
                 <Text strong className="text-lg">Điều khiển trạng thái:</Text>
                 <button 
                     onClick={async () => {
+                        setActiveStreamTarget('ENTRY');
                         try {
                             const res = await parkingSessionService.setStatus("CHECKIN");
                             const msg = res.message || "Đã chuyển trạng thái: CHECKIN";
@@ -247,6 +348,7 @@ export default function MonitoringPage() {
                 </button>
                 <button 
                     onClick={async () => {
+                        setActiveStreamTarget('EXIT');
                         try {
                             const res = await parkingSessionService.setStatus("CHECKOUT");
                             const msg = res.message || "Đã chuyển trạng thái: CHECKOUT";
@@ -303,7 +405,7 @@ export default function MonitoringPage() {
           >
             <div className="relative aspect-video bg-black flex items-center justify-center group">
               <img 
-                src={videoUrl || entryCameraUrl} 
+                src={(activeStreamTarget === 'ENTRY' && videoUrl) ? videoUrl : entryCameraUrl} 
                 alt="Entry Camera" 
                 className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
               />
@@ -331,7 +433,7 @@ export default function MonitoringPage() {
           >
             <div className="relative aspect-video bg-black flex items-center justify-center group">
               <img 
-                src={exitCameraUrl} 
+                src={(activeStreamTarget === 'EXIT' && videoUrl) ? videoUrl : exitCameraUrl} 
                 alt="Exit Camera" 
                 className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
               />
@@ -367,6 +469,17 @@ export default function MonitoringPage() {
                 </div>
                 <h3 className="text-2xl font-bold text-gray-600 mb-2">THẺ CHƯA ĐƯỢC ĐĂNG KÝ</h3>
                 <p className="text-gray-500 text-lg">Vui lòng đăng ký thẻ trước khi sử dụng.</p>
+             </div>
+          ) : (currentEvent.status === "ALREADY_IN_PARK") ? (
+             <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-orange-100 rounded-full mb-6 animate-pulse">
+                  <AlertTriangle className="w-10 h-10 text-orange-600" />
+                </div>
+                <h3 className="text-2xl font-bold text-orange-600 mb-2">XE ĐÃ Ở TRONG BÃI</h3>
+                <p className="text-gray-600 text-lg">Hệ thống ghi nhận xe này đã check-in và chưa check-out.</p>
+                {currentEvent.licensePlate && (
+                    <p className="text-gray-800 font-bold mt-2 text-xl">Biển số: {currentEvent.licensePlate}</p>
+                )}
              </div>
           ) : (currentEvent.status === "DENIED") ? (
             <div className="text-center py-12">
@@ -432,10 +545,25 @@ export default function MonitoringPage() {
                   </div>
                   
                   {currentEvent.type === 'CHECK_OUT' && (
-                    <div className="flex justify-between items-center">
-                      <Text type="secondary">Thời gian ra:</Text>
-                      <Text strong>{formatDate(currentEvent.checkOutAt || currentEvent.checkOutTime)}</Text>
-                    </div>
+                    <>
+                      <div className="flex justify-between items-center">
+                        <Text type="secondary">Thời gian ra:</Text>
+                        <Text strong>{formatDate(currentEvent.checkOutAt || currentEvent.checkOutTime)}</Text>
+                      </div>
+                      
+                      {currentEvent.checkInImageUrl && (
+                        <div className="mt-4">
+                          <Text type="secondary" className="block mb-2">Ảnh lúc vào:</Text>
+                          <div className="relative aspect-video bg-black rounded overflow-hidden border border-gray-300">
+                            <img 
+                              src={`http://localhost:8080${currentEvent.checkInImageUrl}`} 
+                              alt="Check-in Capture" 
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="border-t pt-4 mt-4">

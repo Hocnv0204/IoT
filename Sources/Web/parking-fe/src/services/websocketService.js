@@ -70,6 +70,23 @@ class WebSocketService {
           console.error("Error parsing checkout message:", e);
         }
       });
+
+      // Subscribe to Error Notifications
+      this.stompClient.subscribe('/topic/error-notification', (message) => {
+        console.log("Received raw error notification:", message.body);
+        try {
+          const payload = JSON.parse(message.body);
+          console.log("Parsed error payload:", payload);
+          
+          const eventData = { 
+            ...payload,
+            type: 'ERROR_NOTIFICATION'
+          };
+          this.notifySubscribers(eventData);
+        } catch (e) {
+          console.error("Error parsing error notification:", e);
+        }
+      });
     }
   }
 
