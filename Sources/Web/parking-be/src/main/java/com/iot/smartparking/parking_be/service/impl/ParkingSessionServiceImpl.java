@@ -10,6 +10,7 @@ import com.iot.smartparking.parking_be.dto.ParkingSessionDTO;
 import com.iot.smartparking.parking_be.dto.request.admin.LogRequest;
 import com.iot.smartparking.parking_be.dto.request.user.CheckRequest;
 import com.iot.smartparking.parking_be.dto.response.CheckOutResponseDTO;
+import com.iot.smartparking.parking_be.dto.response.ErrorNotificationDTO;
 import com.iot.smartparking.parking_be.dto.response.StatisticsResponse;
 import com.iot.smartparking.parking_be.exception.AppException;
 import com.iot.smartparking.parking_be.exception.ErrorCode;
@@ -68,7 +69,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Mono<DbResult> dbTask = Mono.fromCallable(() -> {
             // Tìm thẻ
             RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid)
-                    .orElseThrow(() -> new AppException(ErrorCode.CARD_NOT_FOUND));
+                    .orElseThrow(() -> {
+                        sendErrorNotification("CHECK_IN", rfidUid, ErrorCode.CARD_NOT_FOUND);
+                        return new AppException(ErrorCode.CARD_NOT_FOUND);
+                    });
 
             boolean isDaily = isDailyCard(card);
 
@@ -76,12 +80,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             Vehicle vehicle = null;
             if (!isDaily) {
                 vehicle = vehicleRepository.findByCardId(card.getId())
-                        .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
+                        .orElseThrow(() -> {
+                            sendErrorNotification("CHECK_IN", rfidUid, ErrorCode.VEHICLE_NOT_FOUND);
+                            return new AppException(ErrorCode.VEHICLE_NOT_FOUND);
+                        });
             }
 
             // Kiểm tra xe có trong bãi không
             boolean isAlreadyIn = parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId(), ParkStatus.IN.name());
             if (isAlreadyIn) {
+                sendErrorNotification("CHECK_IN", rfidUid, ErrorCode.VEHICLE_ALREADY_IN);
                 throw new AppException(ErrorCode.VEHICLE_ALREADY_IN);
             }
 
@@ -178,6 +186,27 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         return CardType.DAILY.name().equalsIgnoreCase(card.getType());
     }
 
+    /**
+     * Helper method để gửi error notification qua WebSocket trước khi throw exception
+     */
+    private void sendErrorNotification(String type, String rfid, ErrorCode errorCode) {
+        try {
+            ErrorNotificationDTO errorNotification = ErrorNotificationDTO.builder()
+                    .type(type)
+                    .rfid(rfid)
+                    .errorCode(errorCode.getCode())
+                    .errorMessage(errorCode.getMessage())
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            
+            String topic = "/topic/error-notification";
+            messagingTemplate.convertAndSend(topic, errorNotification);
+            log.info("WebSocket: Gửi thông báo lỗi {} đến frontend qua topic {}", errorCode.getMessage(), topic);
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi error notification qua WebSocket: {}", e.getMessage(), e);
+        }
+    }
+
     private double calculateTotalFee(LocalDateTime start, LocalDateTime end) {
         LocalTime dayStart = LocalTime.of(6, 0);
         LocalTime dayEnd = LocalTime.of(18, 0);
@@ -213,7 +242,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Integer vehicleId = null ;
         if(request.getLicensePlate() != null) {
             Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate()).orElseThrow(
-                    () -> new AppException(ErrorCode.VEHICLE_NOT_FOUND)
+                    () -> {
+                        sendErrorNotification("GET_LOGS", null, ErrorCode.VEHICLE_NOT_FOUND);
+                        return new AppException(ErrorCode.VEHICLE_NOT_FOUND);
+                    }
             );
             vehicleId = vehicle.getId();
         }
@@ -267,7 +299,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Mono<DbResult> dbTask = Mono.fromCallable(() -> {
             // Tìm thẻ
             RFIDCard card = cardRepository.findRFIDCardByCode(rfidUid)
-                    .orElseThrow(() -> new AppException(ErrorCode.CARD_NOT_FOUND));
+                    .orElseThrow(() -> {
+                        sendErrorNotification("CHECK_OUT", rfidUid, ErrorCode.CARD_NOT_FOUND);
+                        return new AppException(ErrorCode.CARD_NOT_FOUND);
+                    });
 
             boolean isDaily = isDailyCard(card);
 
@@ -275,12 +310,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             Vehicle vehicle = null;
             if (!isDaily) {
                 vehicle = vehicleRepository.findByCardId(card.getId())
-                        .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_NOT_FOUND));
+                        .orElseThrow(() -> {
+                            sendErrorNotification("CHECK_OUT", rfidUid, ErrorCode.VEHICLE_NOT_FOUND);
+                            return new AppException(ErrorCode.VEHICLE_NOT_FOUND);
+                        });
             }
 
             // Kiểm tra xe có trong bãi không
             boolean isAlreadyIn = parkingSessionRepository.existsParkingSessionByCardAndStatus(card.getId(), ParkStatus.IN.name());
             if (!isAlreadyIn) {
+                sendErrorNotification("CHECK_OUT", rfidUid, ErrorCode.VEHICLE_ALREADY_OUT);
                 throw new AppException(ErrorCode.VEHICLE_ALREADY_OUT);
             }
 
@@ -320,7 +359,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                         // Tìm session hiện tại (status = IN)
                         ParkingSession currentSession = parkingSessionRepository
                                 .findByCardIdAndStatus(card.getId(), ParkStatus.IN.name())
-                                .orElseThrow(() -> new AppException(ErrorCode.VEHICLE_ALREADY_OUT));
+                                .orElseThrow(() -> {
+                                    sendErrorNotification("CHECK_OUT", rfidUid, ErrorCode.VEHICLE_ALREADY_OUT);
+                                    return new AppException(ErrorCode.VEHICLE_ALREADY_OUT);
+                                });
 
                         // Update session với thông tin checkout
                         LocalDateTime now = LocalDateTime.now();
@@ -374,6 +416,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                                 .cardType(card.getType())
                                 .feeCalculated(fee)
                                 .imageUrl(imageUrl)
+                                .checkInImageUrl(savedSession.getImageIn())
                                 .build();
                     }).subscribeOn(Schedulers.boundedElastic());
                 })

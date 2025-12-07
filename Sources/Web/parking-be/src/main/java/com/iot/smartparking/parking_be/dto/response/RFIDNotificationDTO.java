@@ -15,3 +15,4 @@ public class RFIDNotificationDTO {
     private Long timestamp; // Timestamp khi nhận được
 }
 
+

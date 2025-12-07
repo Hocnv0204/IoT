@@ -82,7 +82,12 @@ export default function RegisterDailyTicket() {
       setScannedCardId('');
     } catch (error) {
       console.error("Registration error:", error);
-      const errorMsg = error.response?.data?.message || error.message || "Đăng ký thất bại. Vui lòng thử lại.";
+      let errorMsg = error.response?.data?.message || error.message || "Đăng ký thất bại. Vui lòng thử lại.";
+      
+      if (errorMsg && errorMsg.toLowerCase().includes("card already exists")) {
+        errorMsg = "Thẻ này đã tồn tại trong hệ thống";
+      }
+
       message.error(errorMsg);
       setResult({ type: 'error', message: errorMsg });
     } finally {
