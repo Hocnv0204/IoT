@@ -1,26 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tag, Descriptions, Typography, Spin, Empty, Input, message } from 'antd';
-import { Video, Car, CreditCard, User, Clock, FileText, AlertCircle, LogIn, LogOut, CheckCircle, XCircle, AlertTriangle, Home } from 'lucide-react';
+import { Tag, message, ConfigProvider, theme } from 'antd';
+import { Video, Car, CreditCard, User, Clock, FileText, AlertCircle, LogIn, LogOut, CheckCircle, XCircle, AlertTriangle, Home, Wifi, WifiOff, Monitor } from 'lucide-react';
 import { websocketService } from '../services/websocketService';
 import { parkingSessionService } from '../services/parkingSessionService';
-
-const { Title, Text } = Typography;
+import { useNavigate } from '@tanstack/react-router';
 
 export default function MonitoringPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [currentEvent, setCurrentEvent] = useState(null);
   const [scannedCardId, setScannedCardId] = useState('');
   
   // ESP32 Integration State
-  const [esp32Ip, setEsp32Ip] = useState('192.168.2.16'); // Default IP from user logs
+  const [esp32Ip, setEsp32Ip] = useState('192.168.2.16');
   const [esp32Connected, setEsp32Connected] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
-  const [result, setResult] = useState(null); // { type: 'success' | 'error', title: '', message: '' }
-  const [activeStreamTarget, setActiveStreamTarget] = useState('ENTRY'); // 'ENTRY' or 'EXIT'
+  const [result, setResult] = useState(null);
+  const [activeStreamTarget, setActiveStreamTarget] = useState('ENTRY');
 
-  
-  // Placeholder for video streams - in production these would be real MJPEG streams
   const entryCameraUrl = "https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=1000&auto=format&fit=crop"; 
   const exitCameraUrl = "https://images.unsplash.com/photo-1542282088-fe8426682b8f?q=80&w=1000&auto=format&fit=crop";
 
@@ -28,570 +26,346 @@ export default function MonitoringPage() {
     const handleEvent = (data) => {
       console.log("New parking event:", data);
 
-      // Log specifically for ESP32 data
       if (data.rfid) {
         console.log("✅ [ESP32] Received RFID data from ESP32:", data.rfid);
       }
 
       // Handle "Not found card" error
       if (data.message === "Not found card" || data.apiErrorResponse?.code === 404) {
-          const msg = "Thẻ chưa được đăng ký trong hệ thống";
-          message.error(msg, 5);
-          setResult({
-              type: 'error',
-              title: 'Lỗi quẹt thẻ',
-              message: msg
-          });
-          
-          // Auto dismiss result after 5s
-          setTimeout(() => {
-            setResult(prev => (prev && prev.message === msg ? null : prev));
-          }, 5000);
-          
-          setCurrentEvent({
-              ...data,
-              status: "NOT_FOUND",
-              ownerName: "Chưa đăng ký",
-              licensePlate: "Unknown",
-              vehicleType: "Unknown"
-          });
-          
-          if (data.rfid) {
-            setScannedCardId(data.rfid);
-          }
-          return;
+        const msg = "Thẻ chưa được đăng ký trong hệ thống";
+        message.error(msg, 5);
+        setResult({ type: 'error', title: 'Lỗi quẹt thẻ', message: msg });
+        setTimeout(() => setResult(prev => (prev && prev.message === msg ? null : prev)), 5000);
+        setCurrentEvent({ ...data, status: "NOT_FOUND", ownerName: "Chưa đăng ký", licensePlate: "Unknown", vehicleType: "Unknown" });
+        if (data.rfid) setScannedCardId(data.rfid);
+        return;
       }
 
       // Handle "Vehicle already in park" error (409)
       if (data.message === "Vehicle already in park" || data.apiErrorResponse?.code === 409) {
-          const msg = "Xe đã ở trong bãi! Không thể check-in lại.";
-          message.error(msg, 5);
-          setResult({
-              type: 'error',
-              title: 'Lỗi Check-in',
-              message: msg
-          });
-
-          // Auto dismiss result after 5s
-          setTimeout(() => {
-            setResult(prev => (prev && prev.message === msg ? null : prev));
-          }, 5000);
-          
-          setCurrentEvent({
-              ...data,
-              status: "ALREADY_IN_PARK",
-          });
-          
-          if (data.rfid) {
-            setScannedCardId(data.rfid);
-          }
-          return;
+        const msg = "Xe đã ở trong bãi! Không thể check-in lại.";
+        message.error(msg, 5);
+        setResult({ type: 'error', title: 'Lỗi Check-in', message: msg });
+        setTimeout(() => setResult(prev => (prev && prev.message === msg ? null : prev)), 5000);
+        setCurrentEvent({ ...data, status: "ALREADY_IN_PARK" });
+        if (data.rfid) setScannedCardId(data.rfid);
+        return;
       }
 
-      // Handle "Vehicle already out park" error (409)
+      // Handle "Vehicle already out park" error
       if (data.message === "Vehicle already out park") {
-          const msg = "Xe không có trong bãi! Không thể check-out.";
-          message.error(msg, 5);
-          setResult({
-              type: 'error',
-              title: 'Lỗi Check-out',
-              message: msg
-          });
-
-          // Auto dismiss result after 5s
-          setTimeout(() => {
-            setResult(prev => (prev && prev.message === msg ? null : prev));
-          }, 5000);
-          
-          setCurrentEvent({
-              ...data,
-              status: "ALREADY_OUT_PARK",
-          });
-          
-          if (data.rfid) {
-            setScannedCardId(data.rfid);
-          }
-          return;
+        const msg = "Xe không có trong bãi! Không thể check-out.";
+        message.error(msg, 5);
+        setResult({ type: 'error', title: 'Lỗi Check-out', message: msg });
+        setTimeout(() => setResult(prev => (prev && prev.message === msg ? null : prev)), 5000);
+        setCurrentEvent({ ...data, status: "ALREADY_OUT_PARK" });
+        if (data.rfid) setScannedCardId(data.rfid);
+        return;
       }
 
       // Handle WebSocket Error Notifications
       if (data.type === 'ERROR_NOTIFICATION') {
-        console.log("❌ [WebSocket] Error Notification:", data);
-        
         let errorMsg = data.errorMessage || data.message || "Có lỗi xảy ra";
-        let errorTitle = `Lỗi ${data.errorCode || data.apiErrorResponse?.code || 'Hệ thống'}`;
-
-        // Localize specific errors
-        if (errorMsg === "Not found card" || data.apiErrorResponse?.code === 404) {
-             errorMsg = "Thẻ chưa được đăng ký trong hệ thống";
-             errorTitle = "Lỗi quẹt thẻ";
-        }
-        
-        if (errorMsg === "Vehicle already in park") {
-             errorMsg = "Xe đã ở trong bãi! Không thể check-in lại.";
-             errorTitle = "Lỗi Check-in";
-        }
-        
-        if (errorMsg === "Vehicle already out park") {
-             errorMsg = "Xe không có trong bãi! Không thể check-out.";
-             errorTitle = "Lỗi Check-out";
-        }
-
+        let errorTitle = `Lỗi ${data.errorCode || 'Hệ thống'}`;
+        if (errorMsg === "Not found card") { errorMsg = "Thẻ chưa được đăng ký trong hệ thống"; errorTitle = "Lỗi quẹt thẻ"; }
+        if (errorMsg === "Vehicle already in park") { errorMsg = "Xe đã ở trong bãi! Không thể check-in lại."; errorTitle = "Lỗi Check-in"; }
+        if (errorMsg === "Vehicle already out park") { errorMsg = "Xe không có trong bãi! Không thể check-out."; errorTitle = "Lỗi Check-out"; }
         message.error(errorMsg, 5);
-        
-        setResult({
-          type: 'error',
-          title: errorTitle,
-          message: errorMsg
-        });
-
-        // Auto dismiss result after 5s
-        setTimeout(() => {
-            setResult(prev => (prev && prev.message === errorMsg ? null : prev));
-        }, 5000);
-
-        if (data.rfid) {
-          setScannedCardId(data.rfid);
-        }
+        setResult({ type: 'error', title: errorTitle, message: errorMsg });
+        setTimeout(() => setResult(prev => (prev && prev.message === errorMsg ? null : prev)), 5000);
+        if (data.rfid) setScannedCardId(data.rfid);
         return;
       }
 
       setCurrentEvent(data);
-      if (data.rfid) {
-        setScannedCardId(data.rfid);
-      }
+      if (data.rfid) setScannedCardId(data.rfid);
     };
 
     websocketService.connect(
-      () => {
-        console.log("🚀 [System] Frontend connected to Backend WebSocket. Ready to receive ESP32 events.");
-        setConnected(true);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("❌ [System] WebSocket Connection Error:", err);
-        setConnected(false);
-        setLoading(false);
-      }
+      () => { setConnected(true); setLoading(false); },
+      () => { setConnected(false); setLoading(false); }
     );
 
     const unsubscribe = websocketService.subscribe(handleEvent);
-
-    return () => {
-      unsubscribe();
-      websocketService.disconnect();
-      websocketService.disconnectEsp32();
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-    };
+    return () => { unsubscribe(); websocketService.disconnect(); websocketService.disconnectEsp32(); if (videoUrl) URL.revokeObjectURL(videoUrl); };
   }, []);
 
-  // Handle ESP32 Connection
   const handleConnectEsp32 = () => {
     if (esp32Connected) {
-        websocketService.disconnectEsp32();
-        setEsp32Connected(false);
-        setVideoUrl(null);
-        return;
+      websocketService.disconnectEsp32();
+      setEsp32Connected(false);
+      setVideoUrl(null);
+      return;
     }
 
     websocketService.connectToEsp32(
-        esp32Ip,
-        () => {
-            console.log("✅ [ESP32] Connected to Camera & RFID");
-            setEsp32Connected(true);
-        },
-        (data) => {
-
-            if (data.type === 'CHECK_IN') {
-                console.log("✅ [ESP32] RFID Scanned:", data.rfid);
-                setScannedCardId(data.rfid);
-                // Optional: Send to backend if needed, but currently just displaying
-            } else if (data.type === 'VIDEO_FRAME') {
-                // Create Blob from ArrayBuffer
-                const blob = new Blob([data.buffer], { type: 'image/jpeg' });
-                const url = URL.createObjectURL(blob);
-                setVideoUrl((prev) => {
-                    if (prev) URL.revokeObjectURL(prev); // Clean up old URL
-                    return url;
-                });
-            }
-
-        },
-        () => {
-            console.log("❌ [ESP32] Disconnected");
-            setEsp32Connected(false);
-            setVideoUrl(null);
+      esp32Ip,
+      () => { setEsp32Connected(true); },
+      (data) => {
+        if (data.type === 'CHECK_IN') setScannedCardId(data.rfid);
+        else if (data.type === 'VIDEO_FRAME') {
+          const blob = new Blob([data.buffer], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+          setVideoUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
         }
+      },
+      () => { setEsp32Connected(false); setVideoUrl(null); }
     );
   };
 
+  const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleString('vi-VN') : "-";
+  const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleString('vi-VN');
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  const handleStatusChange = async (status, target) => {
+    setActiveStreamTarget(target);
+    try {
+      const res = await parkingSessionService.setStatus(status);
+      const msg = res.message || `Đã chuyển trạng thái: ${status}`;
+      message.success(msg);
+      setResult({ type: 'success', title: 'Chuyển trạng thái thành công', message: msg });
+      setTimeout(() => setResult(prev => (prev && prev.type === 'success' ? null : prev)), 3000);
+    } catch (e) {
+      const errorMsg = e.response?.data?.message || "Lỗi khi set trạng thái";
+      message.error(errorMsg);
+      setResult({ type: 'error', title: 'Lỗi chuyển trạng thái', message: errorMsg });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorBgContainer: 'rgba(255,255,255,0.05)', colorBorder: 'rgba(255,255,255,0.1)', colorText: 'rgba(255,255,255,0.85)' } }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Header */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
-          <div className="flex items-center gap-3">
-            <Video className="w-8 h-8 text-blue-600" />
-            <div>
-              <Title level={4} className="!mb-0">Hệ thống Giám sát Bãi đỗ xe</Title>
-              <Text type="secondary">Real-time Vehicle Monitoring System</Text>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.location.href = '/dashboard'}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors mr-2"
-              title="Về trang chủ"
-            >
-              <Home size={24} className="text-gray-600" />
-            </button>
-            <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
-            <Text strong>{connected ? 'Hệ thống Online' : 'Mất kết nối'}</Text>
-          </div>
-        </div>
-
-        {/* ESP32 Connection Panel */}
-        <Card className="shadow-sm border-l-4 border-l-orange-500">
-            <div className="flex items-center gap-4 flex-wrap">
+        <header className="bg-white/5 backdrop-blur-xl border-b border-white/10">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/25">
+                  <Monitor className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">Giám sát bãi đỗ xe</h1>
+                  <p className="text-sm text-white/60">Real-time Vehicle Monitoring</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                    <Text strong>ESP32 IP:</Text>
-                    <Input 
-                        value={esp32Ip} 
-                        onChange={(e) => setEsp32Ip(e.target.value)} 
-                        placeholder="192.168.1.x" 
-                        style={{ width: '150px' }}
-                        disabled={esp32Connected}
-                    />
+                  <div className={`w-3 h-3 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`}></div>
+                  <span className="text-white/80 text-sm">{connected ? 'Online' : 'Offline'}</span>
                 </div>
-                <button 
-                    onClick={handleConnectEsp32}
-                    className={`px-4 py-2 rounded font-bold text-white transition-colors ${
-                        esp32Connected 
-                        ? 'bg-red-500 hover:bg-red-600' 
-                        : 'bg-green-500 hover:bg-green-600'
-                    }`}
-                >
-                    {esp32Connected ? 'Ngắt kết nối ESP32' : 'Kết nối ESP32'}
+                <button onClick={() => navigate({ to: '/dashboard' })} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg transition-all">
+                  <Home className="w-4 h-4" /><span className="hidden sm:inline">Trang chủ</span>
                 </button>
-                {esp32Connected && <Tag color="green">Đã kết nối Camera & RFID</Tag>}
+              </div>
             </div>
-        </Card>
-
-        {/* Custom Notification Area */}
-        {result && (
-          <div className={`p-4 rounded-xl shadow-sm border-l-4 flex items-start gap-4 transition-all duration-500 animate-in fade-in slide-in-from-top-4 ${
-            result.type === 'success' 
-              ? 'bg-green-50 border-green-500 text-green-800' 
-              : 'bg-red-50 border-red-500 text-red-800'
-          }`}>
-            <div className={`p-2 rounded-full ${
-              result.type === 'success' ? 'bg-green-100' : 'bg-red-100'
-            }`}>
-              {result.type === 'success' ? <CheckCircle size={24} className="text-green-600"/> : <AlertTriangle size={24} className="text-red-600"/>}
-            </div>
-            <div className="flex-1">
-              <h4 className="font-bold text-lg mb-1">{result.title}</h4>
-              <p className="opacity-90">{result.message}</p>
-            </div>
-            <button 
-              onClick={() => setResult(null)}
-              className={`p-1 rounded hover:bg-black/5 transition-colors ${
-                result.type === 'success' ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              <XCircle size={20} />
-            </button>
           </div>
-        )}
+        </header>
 
-        {/* Status Control Panel */}
-        <Card className="shadow-sm border-l-4 border-l-blue-500">
+        <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+          {/* ESP32 Connection */}
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
             <div className="flex items-center gap-4 flex-wrap">
-                <Text strong className="text-lg">Điều khiển trạng thái:</Text>
-                <button 
-                    onClick={async () => {
-                        setActiveStreamTarget('ENTRY');
-                        try {
-                            const res = await parkingSessionService.setStatus("CHECKIN");
-                            const msg = res.message || "Đã chuyển trạng thái: CHECKIN";
-                            message.success(msg);
-                            setResult({ 
-                                type: 'success', 
-                                title: 'Chuyển trạng thái thành công',
-                                message: msg 
-                            });
-                        } catch (e) {
-                            console.error(e);
-                            const errorMsg = e.response?.data?.message || "Lỗi khi set trạng thái";
-                            message.error(errorMsg);
-                            setResult({ 
-                                type: 'error', 
-                                title: 'Lỗi chuyển trạng thái',
-                                message: errorMsg 
-                            });
-                        }
-                    }}
-                    className="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 transition-colors flex items-center gap-2"
-                >
-                    <LogIn size={18} />
-                    Check In
-                </button>
-                <button 
-                    onClick={async () => {
-                        setActiveStreamTarget('EXIT');
-                        try {
-                            const res = await parkingSessionService.setStatus("CHECKOUT");
-                            const msg = res.message || "Đã chuyển trạng thái: CHECKOUT";
-                            message.success(msg);
-                            setResult({ 
-                                type: 'success', 
-                                title: 'Chuyển trạng thái thành công',
-                                message: msg 
-                            });
-                        } catch (e) {
-                            console.error(e);
-                            const errorMsg = e.response?.data?.message || "Lỗi khi set trạng thái";
-                            message.error(errorMsg);
-                            setResult({ 
-                                type: 'error', 
-                                title: 'Lỗi chuyển trạng thái',
-                                message: errorMsg 
-                            });
-                        }
-                    }}
-                    className="px-4 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700 transition-colors flex items-center gap-2"
-                >
-                    <LogOut size={18} />
-                    Check Out
-                </button>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${esp32Connected ? 'bg-emerald-500/20' : 'bg-white/10'}`}>
+                  <Wifi className={`w-5 h-5 ${esp32Connected ? 'text-emerald-400' : 'text-white/40'}`} />
+                </div>
+                <input value={esp32Ip} onChange={(e) => setEsp32Ip(e.target.value)} placeholder="IP ESP32" disabled={esp32Connected} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 outline-none w-40" />
+              </div>
+              <button onClick={handleConnectEsp32} className={`px-4 py-2 rounded-xl flex items-center gap-2 font-medium transition-all ${esp32Connected ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                {esp32Connected ? <WifiOff size={18}/> : <Wifi size={18}/>}
+                {esp32Connected ? "Ngắt" : "Kết nối ESP32"}
+              </button>
+              {esp32Connected && <Tag color="green">Đã kết nối Camera & RFID</Tag>}
             </div>
-        </Card>
-
-        {/* Card Scanner Input */}
-        <Card className="shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-blue-600">
-               <CreditCard size={24} />
-               <Text strong className="text-lg">Mã thẻ vừa quét:</Text>
-            </div>
-            <Input 
-                value={scannedCardId} 
-                onChange={(e) => setScannedCardId(e.target.value)} 
-                placeholder="Chờ quẹt thẻ..." 
-                style={{ maxWidth: '400px', fontSize: '1.2em', fontWeight: 'bold', color: '#1890ff' }}
-                readOnly
-            />
-            <Text type="secondary" className="text-xs">(Dữ liệu từ ESP32-CAM)</Text>
           </div>
-        </Card>
 
-        {/* Video Feeds */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Entry Camera */}
-          <Card 
-            title={<div className="flex items-center gap-2"><Video size={18}/> Camera Lối vào (Entry)</div>}
-            className="shadow-md overflow-hidden"
-            styles={{ body: { padding: 0 } }}
-          >
-            <div className="relative aspect-video bg-black flex items-center justify-center group">
-              <img 
-                src={(activeStreamTarget === 'ENTRY' && videoUrl) ? videoUrl : entryCameraUrl} 
-                alt="Entry Camera" 
-                className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-              />
-              <div className="absolute top-4 right-4 bg-red-600 text-white text-xs px-2 py-1 rounded animate-pulse">
-                LIVE
+          {/* Result Notification */}
+          {result && (
+            <div className={`p-4 rounded-xl border flex items-start gap-4 ${result.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+              <div className={`p-2 rounded-full ${result.type === 'success' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
+                {result.type === 'success' ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
               </div>
-              
-              {/* Overlay Image from BE when swiping at Entry */}
-              {currentEvent?.type === 'CHECK_IN' && currentEvent?.imageUrl && (
-                <div className="absolute inset-0 z-10 bg-black/90 flex items-center justify-center">
-                   <img src={`http://localhost:8080${currentEvent.imageUrl}`} alt="Captured Plate" className="w-full h-full object-contain" />
-                   <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs text-center py-2">
-                      Ảnh chụp lúc {new Date(currentEvent.checkInAt || Date.now()).toLocaleTimeString()}
-                   </div>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Exit Camera */}
-          <Card 
-            title={<div className="flex items-center gap-2"><Video size={18}/> Camera Lối ra (Exit)</div>}
-            className="shadow-md overflow-hidden"
-            styles={{ body: { padding: 0 } }}
-          >
-            <div className="relative aspect-video bg-black flex items-center justify-center group">
-              <img 
-                src={(activeStreamTarget === 'EXIT' && videoUrl) ? videoUrl : exitCameraUrl} 
-                alt="Exit Camera" 
-                className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-              />
-              <div className="absolute top-4 right-4 bg-red-600 text-white text-xs px-2 py-1 rounded animate-pulse">
-                LIVE
+              <div className="flex-1">
+                <h4 className="font-bold text-lg mb-1">{result.title}</h4>
+                <p className="opacity-90">{result.message}</p>
               </div>
-
-              {/* Overlay Image from BE when swiping at Exit */}
-              {currentEvent?.type === 'CHECK_OUT' && currentEvent?.imageUrl && (
-                <div className="absolute inset-0 z-10 bg-black/90 flex items-center justify-center">
-                   <img src={`http://localhost:8080${currentEvent.imageUrl}`} alt="Captured Plate" className="w-full h-full object-contain" />
-                   <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs text-center py-2">
-                      Ảnh chụp lúc {new Date(currentEvent.checkOutAt || Date.now()).toLocaleTimeString()}
-                   </div>
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        {/* Transaction Info Panel */}
-        <Card className="shadow-lg border-t-4 border-t-blue-600">
-          {!currentEvent ? (
-             <div className="text-center py-12 text-gray-400">
-               <Car className="w-16 h-16 mx-auto mb-4 opacity-20" />
-               <Text className="text-lg">Chờ quẹt thẻ...</Text>
-               <p className="text-sm mt-2">Thông tin xe sẽ hiển thị tại đây khi có lượt ra/vào</p>
-             </div>
-          ) : (currentEvent.status === "NOT_FOUND") ? (
-             <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-6">
-                  <User className="w-10 h-10 text-gray-400" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-600 mb-2">THẺ CHƯA ĐƯỢC ĐĂNG KÝ</h3>
-                <p className="text-gray-500 text-lg">Vui lòng đăng ký thẻ trước khi sử dụng.</p>
-             </div>
-          ) : (currentEvent.status === "ALREADY_IN_PARK") ? (
-             <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-orange-100 rounded-full mb-6 animate-pulse">
-                  <AlertTriangle className="w-10 h-10 text-orange-600" />
-                </div>
-                <h3 className="text-2xl font-bold text-orange-600 mb-2">XE ĐÃ Ở TRONG BÃI</h3>
-                <p className="text-gray-600 text-lg">Hệ thống ghi nhận xe này đã check-in và chưa check-out.</p>
-                {currentEvent.licensePlate && (
-                    <p className="text-gray-800 font-bold mt-2 text-xl">Biển số: {currentEvent.licensePlate}</p>
-                )}
-             </div>
-          ) : (currentEvent.status === "DENIED") ? (
-            <div className="text-center py-12">
-               <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6 animate-bounce">
-                 <AlertCircle className="w-10 h-10 text-red-600" />
-               </div>
-               <h3 className="text-2xl font-bold text-red-600 mb-2">CẢNH BÁO: BIỂN SỐ KHÔNG KHỚP!</h3>
-               <p className="text-gray-600 text-lg">Hệ thống phát hiện biển số xe ra không trùng khớp với lúc vào.</p>
-               <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg inline-block text-left">
-                 <p className="font-semibold text-red-800">Chi tiết lỗi:</p>
-                 <ul className="list-disc list-inside text-red-700 mt-1">
-                   <li>Trạng thái: {currentEvent.status}</li>
-                   <li>Biển số: {currentEvent.licensePlate}</li>
-                   <li>Thông điệp: {currentEvent.message || "License plate mismatch"}</li>
-                 </ul>
-               </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left: Vehicle & Owner Info */}
-              <div className="lg:col-span-2 space-y-6">
-                 <div className="flex items-center justify-between border-b pb-4">
-                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <Car className="text-blue-600"/> 
-                      Thông tin xe & Chủ sở hữu
-                    </h3>
-                    <Tag color={currentEvent.type === 'CHECK_IN' ? 'green' : 'orange'} className="text-lg px-4 py-1">
-                      {currentEvent.type === 'CHECK_IN' ? 'XE VÀO (CHECK-IN)' : 'XE RA (CHECK-OUT)'}
-                    </Tag>
-                 </div>
-                 
-                 <Descriptions bordered column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}>
-                    {/* <Descriptions.Item label={<span className="flex items-center gap-2"><CreditCard size={16}/> Mã thẻ</span>}> */}
-                      {/* <Text strong copyable>{currentEvent.cardId || 'N/A'}</Text> */}
-                    {/* </Descriptions.Item> */}
-                    <Descriptions.Item label={<span className="flex items-center gap-2"><User size={16}/> Chủ xe</span>}>
-                      <Text strong className="text-blue-700 text-lg">{currentEvent.ownerName || 'Khách vãng lai'}</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Biển số xe">
-                      <div className="bg-yellow-100 border-2 border-black px-4 py-1 rounded font-mono font-bold inline-block">
-                        {currentEvent.licensePlate || '--- -- ---'}
-                      </div>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Loại xe">
-                      <Tag color="blue">{currentEvent.vehicleType || 'Xe máy'}</Tag>
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<span className="flex items-center gap-2"><FileText size={16}/> Mô tả</span>} span={2}>
-                      {currentEvent.description || 'Không có mô tả thêm'}
-                    </Descriptions.Item>
-                 </Descriptions>
-              </div>
-
-              {/* Right: Transaction Details */}
-              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <Clock className="text-blue-600"/> Chi tiết giao dịch
-                </h3>
-                
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Text type="secondary">Thời gian vào:</Text>
-                    <Text strong>{formatDate(currentEvent.checkInAt || currentEvent.checkInTime)}</Text>
-                  </div>
-                  
-                  {currentEvent.type === 'CHECK_OUT' && (
-                    <>
-                      <div className="flex justify-between items-center">
-                        <Text type="secondary">Thời gian ra:</Text>
-                        <Text strong>{formatDate(currentEvent.checkOutAt || currentEvent.checkOutTime)}</Text>
-                      </div>
-                      
-                      {currentEvent.checkInImageUrl && (
-                        <div className="mt-4">
-                          <Text type="secondary" className="block mb-2">Ảnh lúc vào:</Text>
-                          <div className="relative aspect-video bg-black rounded overflow-hidden border border-gray-300">
-                            <img 
-                              src={`http://localhost:8080${currentEvent.checkInImageUrl}`} 
-                              alt="Check-in Capture" 
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  <div className="border-t pt-4 mt-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <Text>Loại vé:</Text>
-                      <Tag color={currentEvent.cardType === 'MONTHLY' ? 'purple' : 'cyan'}>
-                        {currentEvent.cardType === 'MONTHLY' ? 'VÉ THÁNG' : 'VÉ LƯỢT'}
-                      </Tag>
-                    </div>
-                    
-                    <div className="flex justify-between items-center mt-4 bg-white p-4 rounded-lg shadow-sm border">
-                      <Text strong className="text-lg">Phí đỗ xe:</Text>
-                      <Text className="text-2xl font-bold text-red-600">
-                        {currentEvent.ticketType === 'MONTHLY' ? '0 đ' : formatCurrency(currentEvent.feeCalculated || 0)}
-                      </Text>
-                    </div>
-                    {currentEvent.ticketType === 'MONTHLY' && (
-                       <div className="text-center mt-2 text-green-600 text-sm flex items-center justify-center gap-1">
-                         <AlertCircle size={14}/> Đã thanh toán tháng
-                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <button onClick={() => setResult(null)} className="p-1 rounded hover:bg-white/10"><XCircle size={20} /></button>
             </div>
           )}
-        </Card>
+
+          {/* Status Control */}
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="text-white font-medium">Điều khiển:</span>
+              <button onClick={() => handleStatusChange("CHECKIN", "ENTRY")} className={`px-5 py-2.5 rounded-xl flex items-center gap-2 font-medium transition-all ${activeStreamTarget === 'ENTRY' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}>
+                <LogIn size={18} />Check In
+              </button>
+              <button onClick={() => handleStatusChange("CHECKOUT", "EXIT")} className={`px-5 py-2.5 rounded-xl flex items-center gap-2 font-medium transition-all ${activeStreamTarget === 'EXIT' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25' : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'}`}>
+                <LogOut size={18} />Check Out
+              </button>
+            </div>
+          </div>
+
+          {/* Card Scanner */}
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+            <div className="flex items-center gap-4">
+              <CreditCard className="w-6 h-6 text-blue-400" />
+              <span className="text-white/80">Mã thẻ vừa quét:</span>
+              <div className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xl font-mono text-blue-400">
+                {scannedCardId || <span className="text-white/30">Chờ quẹt thẻ...</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Video Feeds */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Entry Camera */}
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+                <Video size={18} className="text-emerald-400" />
+                <span className="text-white font-medium">Camera Lối vào</span>
+                {activeStreamTarget === 'ENTRY' && <span className="ml-auto text-xs px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded">ACTIVE</span>}
+              </div>
+              <div className="relative aspect-video bg-black">
+                <img src={(activeStreamTarget === 'ENTRY' && videoUrl) ? videoUrl : entryCameraUrl} alt="Entry Camera" className="w-full h-full object-cover" />
+                <div className="absolute top-4 right-4 bg-red-600 text-white text-xs px-2 py-1 rounded animate-pulse">LIVE</div>
+                {currentEvent?.type === 'CHECK_IN' && currentEvent?.imageUrl && (
+                  <div className="absolute inset-0 z-10 bg-black/90 flex items-center justify-center">
+                    <img src={`http://localhost:8080${currentEvent.imageUrl}`} alt="Captured" className="w-full h-full object-contain" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Exit Camera */}
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+                <Video size={18} className="text-orange-400" />
+                <span className="text-white font-medium">Camera Lối ra</span>
+                {activeStreamTarget === 'EXIT' && <span className="ml-auto text-xs px-2 py-1 bg-orange-500/20 text-orange-400 rounded">ACTIVE</span>}
+              </div>
+              <div className="relative aspect-video bg-black">
+                <img src={(activeStreamTarget === 'EXIT' && videoUrl) ? videoUrl : exitCameraUrl} alt="Exit Camera" className="w-full h-full object-cover" />
+                <div className="absolute top-4 right-4 bg-red-600 text-white text-xs px-2 py-1 rounded animate-pulse">LIVE</div>
+                {currentEvent?.type === 'CHECK_OUT' && currentEvent?.imageUrl && (
+                  <div className="absolute inset-0 z-10 bg-black/90 flex items-center justify-center">
+                    <img src={`http://localhost:8080${currentEvent.imageUrl}`} alt="Captured" className="w-full h-full object-contain" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Transaction Info */}
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6">
+            {!currentEvent ? (
+              <div className="text-center py-12">
+                <Car className="w-16 h-16 mx-auto mb-4 text-white/20" />
+                <p className="text-white/60 text-lg">Chờ quẹt thẻ...</p>
+                <p className="text-white/40 text-sm mt-2">Thông tin xe sẽ hiển thị tại đây</p>
+              </div>
+            ) : currentEvent.status === "NOT_FOUND" ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <User className="w-10 h-10 text-white/40" />
+                </div>
+                <h3 className="text-2xl font-bold text-white/60 mb-2">THẺ CHƯA ĐƯỢC ĐĂNG KÝ</h3>
+                <p className="text-white/40">Vui lòng đăng ký thẻ trước khi sử dụng.</p>
+              </div>
+            ) : currentEvent.status === "ALREADY_IN_PARK" ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                  <AlertTriangle className="w-10 h-10 text-orange-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-orange-400 mb-2">XE ĐÃ Ở TRONG BÃI</h3>
+                <p className="text-white/60">Hệ thống ghi nhận xe này đã check-in và chưa check-out.</p>
+                {currentEvent.licensePlate && <p className="text-white font-bold mt-2 text-xl">{currentEvent.licensePlate}</p>}
+              </div>
+            ) : currentEvent.status === "ALREADY_OUT_PARK" ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                  <AlertCircle className="w-10 h-10 text-red-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-red-400 mb-2">XE KHÔNG CÓ TRONG BÃI</h3>
+                <p className="text-white/60">Không thể check-out vì xe chưa check-in.</p>
+              </div>
+            ) : currentEvent.status === "DENIED" ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                  <AlertCircle className="w-10 h-10 text-red-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-red-400 mb-2">CẢNH BÁO: BIỂN SỐ KHÔNG KHỚP!</h3>
+                <p className="text-white/60">Hệ thống phát hiện biển số xe ra không khớp với lúc vào.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Vehicle Info */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Car className="text-blue-400" />Thông tin xe
+                    </h3>
+                    <Tag color={currentEvent.type === 'CHECK_IN' ? 'green' : 'orange'} className="text-base px-3 py-1">
+                      {currentEvent.type === 'CHECK_IN' ? 'XE VÀO' : 'XE RA'}
+                    </Tag>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/5 rounded-xl p-4">
+                      <div className="text-white/50 text-sm mb-1 flex items-center gap-2"><User size={14} />Chủ xe</div>
+                      <div className="text-white font-medium">{currentEvent.ownerName || 'Khách vãng lai'}</div>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4">
+                      <div className="text-white/50 text-sm mb-1">Biển số xe</div>
+                      <div className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-3 py-1 rounded font-mono font-bold inline-block">
+                        {currentEvent.licensePlate || '---'}
+                      </div>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4">
+                      <div className="text-white/50 text-sm mb-1">Loại xe</div>
+                      <Tag color="blue">{currentEvent.vehicleType || 'Xe máy'}</Tag>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4">
+                      <div className="text-white/50 text-sm mb-1 flex items-center gap-2"><FileText size={14} />Mô tả</div>
+                      <div className="text-white/80">{currentEvent.description || 'Không có'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transaction Details */}
+                <div className="bg-white/5 rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Clock className="text-blue-400" />Chi tiết giao dịch
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between"><span className="text-white/50">Thời gian vào:</span><span className="text-white">{formatDate(currentEvent.checkInAt || currentEvent.checkInTime)}</span></div>
+                    {currentEvent.type === 'CHECK_OUT' && (
+                      <>
+                        <div className="flex justify-between"><span className="text-white/50">Thời gian ra:</span><span className="text-white">{formatDate(currentEvent.checkOutAt || currentEvent.checkOutTime)}</span></div>
+                        {currentEvent.checkInImageUrl && (
+                          <div className="mt-4">
+                            <div className="text-white/50 text-sm mb-2">Ảnh lúc vào:</div>
+                            <div className="aspect-video bg-black rounded-lg overflow-hidden border border-white/10">
+                              <img src={`http://localhost:8080${currentEvent.checkInImageUrl}`} alt="Check-in" className="w-full h-full object-contain" />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <div className="border-t border-white/10 pt-4 mt-4">
+                      <div className="flex justify-between mb-2"><span className="text-white/50">Loại vé:</span><Tag color={currentEvent.cardType === 'MONTHLY' ? 'purple' : 'cyan'}>{currentEvent.cardType === 'MONTHLY' ? 'VÉ THÁNG' : 'VÉ LƯỢT'}</Tag></div>
+                      <div className="bg-white/10 rounded-xl p-4 mt-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-white font-medium">Phí đỗ xe:</span>
+                          <span className="text-2xl font-bold text-emerald-400">{currentEvent.ticketType === 'MONTHLY' ? '0 đ' : formatCurrency(currentEvent.feeCalculated || 0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
       </div>
-    </div>
+    </ConfigProvider>
   );
 }
