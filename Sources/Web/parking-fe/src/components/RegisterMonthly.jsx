@@ -25,6 +25,19 @@ function SmallModal({ open, onClose, title, children }) {
   );
 }
 
+const StepCard = ({ number, title, icon: Icon, children, disabled }) => (
+  <div className={`bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 ${disabled ? 'opacity-50' : ''}`}>
+    <div className="flex items-center gap-3 mb-4">
+      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+        {number}
+      </div>
+      <Icon className="w-5 h-5 text-blue-400" />
+      <h3 className="font-semibold text-white">{title}</h3>
+    </div>
+    {children}
+  </div>
+);
+
 export default function RegisterMonthly() {
   const navigate = useNavigate();
   
@@ -215,19 +228,6 @@ export default function RegisterMonthly() {
       }
     );
   };
-
-  const StepCard = ({ number, title, icon: Icon, children, disabled }) => (
-    <div className={`bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 ${disabled ? 'opacity-50' : ''}`}>
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-          {number}
-        </div>
-        <Icon className="w-5 h-5 text-blue-400" />
-        <h3 className="font-semibold text-white">{title}</h3>
-      </div>
-      {children}
-    </div>
-  );
 
   return (
     <ConfigProvider
