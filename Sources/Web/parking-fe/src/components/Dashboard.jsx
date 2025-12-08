@@ -15,7 +15,8 @@ import {
   ParkingCircle,
   ChevronRight,
   RefreshCw,
-  Power
+  Power,
+  IdCard
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -131,20 +132,12 @@ export default function Dashboard() {
       route: "/monitoring"
     },
     {
-      title: "Đăng ký vé tháng",
-      description: "Đăng ký thẻ xe cho khách hàng",
-      icon: CreditCard,
-      color: "from-indigo-500 to-purple-600",
-      hoverColor: "hover:shadow-purple-500/25",
-      route: "/register-monthly"
-    },
-    {
-      title: "Đăng ký vé ngày",
-      description: "Cấp vé lượt cho khách vãng lai",
-      icon: Calendar,
-      color: "from-blue-500 to-cyan-600",
-      hoverColor: "hover:shadow-blue-500/25",
-      route: "/register-daily"
+      title: "Quản lý thẻ",
+      description: "Danh sách & đăng ký thẻ tháng/ngày",
+      icon: IdCard,
+      color: "from-cyan-500 to-blue-600",
+      hoverColor: "hover:shadow-cyan-500/25",
+      route: "/cards"
     },
     {
       title: "Lịch sử ra vào",
@@ -252,7 +245,7 @@ export default function Dashboard() {
             Truy cập nhanh
           </h3>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {quickActions.map((action, index) => (
               <button
                 key={index}

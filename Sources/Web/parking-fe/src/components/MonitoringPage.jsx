@@ -90,6 +90,16 @@ export default function MonitoringPage() {
     return () => { unsubscribe(); websocketService.disconnect(); websocketService.disconnectEsp32(); if (videoUrl) URL.revokeObjectURL(videoUrl); };
   }, []);
 
+  // Auto-clear event after 10 seconds to revert to video stream
+  useEffect(() => {
+    if (currentEvent) {
+      const timer = setTimeout(() => {
+        setCurrentEvent(null);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentEvent]);
+
   const handleConnectEsp32 = () => {
     if (esp32Connected) {
       websocketService.disconnectEsp32();
