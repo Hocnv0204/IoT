@@ -1,11 +1,10 @@
 package com.iot.smartparking.parking_be.controller;
 
-import com.cloudinary.Api;
 import com.iot.smartparking.parking_be.common.CardStatus;
 import com.iot.smartparking.parking_be.common.CardType;
-import com.iot.smartparking.parking_be.dto.PageResponse;
 import com.iot.smartparking.parking_be.dto.request.admin.AssignCardRequest;
 import com.iot.smartparking.parking_be.dto.request.admin.RegisterDailyCardRequest;
+import com.iot.smartparking.parking_be.dto.request.admin.UpdateCardStatusRequest;
 import com.iot.smartparking.parking_be.dto.response.ApiResponse;
 import com.iot.smartparking.parking_be.exception.AppException;
 import com.iot.smartparking.parking_be.exception.ErrorCode;
@@ -17,7 +16,6 @@ import com.iot.smartparking.parking_be.mapper.VehicleMapper;
 import com.iot.smartparking.parking_be.service.CardService;
 import com.iot.smartparking.parking_be.utils.PageableUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -81,30 +79,24 @@ public class CardsController {
             @RequestParam(value = "orderBy", required = false) String orderBy
     ){
         Pageable pageable = PageableUtils.setPageable(page, size, orderBy, sortBy);
-        Page<RFIDCard> cardPage;
-        if(status != null && type != null){
-            cardPage = cardRepository.findAllByStatusAndType(status, type, pageable);
-        }else if(status != null){
-            cardPage = cardRepository.findAllByStatus(status, pageable);
-        }else if(type != null){
-            cardPage = cardRepository.findAllByType(type, pageable);
-        }else{
-            cardPage = cardRepository.findAll(pageable);
-        }
-
-        PageResponse<RFIDCard> resp = PageResponse.<RFIDCard>builder()
-                .content(cardPage.getContent())
-                .pageNumber(cardPage.getNumber())
-                .pageSize(cardPage.getSize())
-                .totalElements(cardPage.getTotalElements())
-                .last(cardPage.isLast())
-                .totalPages(cardPage.getTotalPages())
-                .build();
-
         return ResponseEntity.ok(
                 ApiResponse.builder()
-                        .data(resp)
+                        .data(cardService.findCards(status, type, pageable))
                         .message("Get cards")
+                        .build()
+        );
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<?>> updateStatus(@PathVariable Integer id,
+                                                       @RequestBody UpdateCardStatusRequest request){
+        if(request.getStatus() == null){
+            throw new AppException(ErrorCode.INVALID_CARD_STATUS);
+        }
+        return ResponseEntity.ok(
+                ApiResponse.builder()
+                        .data(cardService.updateStatus(id, request.getStatus()))
+                        .message("Update status successfully")
                         .build()
         );
     }
