@@ -20,6 +20,27 @@ export const vehicleService = {
     const response = await apiClient.post("/vehicle/register", payload);
     return response.data.data;
   },
+
+  findAll: async (
+    page = 0,
+    size = 10,
+    sortBy = "id",
+    orderBy = "asc"
+  ) => {
+    const params = { page, size, sortBy, orderBy };
+    const response = await apiClient.get("/vehicle/find-all", { params });
+    return response.data.data;
+  },
+
+  getById: async (vehicleId) => {
+    const response = await apiClient.get(`/vehicle/${vehicleId}`);
+    return response.data.data;
+  },
+
+  update: async (vehicleId, payload) => {
+    const response = await apiClient.put(`/vehicle/${vehicleId}`, payload);
+    return response.data.data;
+  },
 };
 
 export default vehicleService;

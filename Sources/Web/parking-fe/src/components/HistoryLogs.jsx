@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { DatePicker, Select, Input, Table, Tag, ConfigProvider, theme } from "antd";
-import { Home, ClipboardList, Search, Calendar, Filter, RefreshCw } from "lucide-react";
+import { DatePicker, Select, Input, Table, Tag, ConfigProvider, theme, Modal, Image, Descriptions } from "antd";
+import { Home, ClipboardList, Search, Calendar, Filter, RefreshCw, Eye } from "lucide-react";
 import { authService } from "../services/authService";
 import { parkingSessionService } from "../services/parkingSessionService";
 
@@ -25,6 +25,25 @@ export default function HistoryLogs() {
   const [status, setStatus] = useState();
   const [licensePlate, setLicensePlate] = useState("");
   const [dateRange, setDateRange] = useState([]);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState(null);
+
+  const showModal = (record) => {
+    setSelectedLog(record);
+    setIsModalOpen(true);
+  };
+
+  const handleOk = () => {
+    setIsModalOpen(false);
+    setSelectedLog(null);
+  };
+
+  const handleCancel = () => {
+    setIsModalOpen(false);
+    setSelectedLog(null);
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -111,6 +130,20 @@ export default function HistoryLogs() {
         <span className="text-white/70">
           {value ? new Date(value).toLocaleString("vi-VN") : "-"}
         </span>
+      ),
+    },
+    {
+      title: "Thao tác",
+      key: "action",
+      align: "center",
+      render: (_, record) => (
+        <button
+          onClick={() => showModal(record)}
+          className="p-2 text-blue-400 transition-colors rounded-lg bg-blue-500/20 hover:bg-blue-500/30 group"
+          title="Xem chi tiết"
+        >
+          <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
+        </button>
       ),
     },
   ];
@@ -248,6 +281,81 @@ export default function HistoryLogs() {
               className="dark-table"
             />
           </div>
+
+          <Modal
+            title={<span className="text-lg font-bold">Chi tiết lượt xe</span>}
+            open={isModalOpen}
+            onOk={handleOk}
+            onCancel={handleCancel}
+            footer={null}
+            width={800}
+            className="dark-modal"
+          >
+            {selectedLog && (
+              <div className="flex flex-col gap-6">
+                 {/* Images Section */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Entry Image */}
+                  <div className="flex flex-col gap-2">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">Ảnh xe vào:</span>
+                    <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border">
+                      {selectedLog.checkInImageUrl ? (
+                         <Image
+                         src={`http://localhost:8080${selectedLog.checkInImageUrl}`}
+                         alt="Check-in"
+                         className="w-full h-full object-cover"
+                       />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          Chưa có ảnh
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 text-center">
+                       Mã thẻ: {selectedLog.cardCode || 'N/A'}
+                    </div>
+                  </div>
+
+                  {/* Exit Image - Show only if exists */}
+                  {(selectedLog.imageUrl && selectedLog.status === 'OUT') && (
+                    <div className="flex flex-col gap-2">
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Ảnh xe ra:</span>
+                      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border">
+                        <Image
+                          src={`http://localhost:8080${selectedLog.imageUrl}`}
+                          alt="Check-out"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="text-xs text-gray-500 text-center">
+                        Phí: {selectedLog.feeCalculated ? selectedLog.feeCalculated.toLocaleString('vi-VN') + ' đ' : 'Miễn phí'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Descriptions bordered column={1} size="small">
+                  <Descriptions.Item label="Biển số xe">
+                    <span className="font-bold text-lg">{selectedLog.licensePlate}</span>
+                  </Descriptions.Item>
+                   <Descriptions.Item label="Chủ xe">
+                    {selectedLog.ownerName}
+                  </Descriptions.Item>
+                   <Descriptions.Item label="Loại thẻ">
+                    {selectedLog.cardType}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Thời gian vào">
+                     {selectedLog.timeIn ? new Date(selectedLog.timeIn).toLocaleString("vi-VN") : "-"}
+                  </Descriptions.Item>
+                  {selectedLog.timeOut && (
+                     <Descriptions.Item label="Thời gian ra">
+                     {new Date(selectedLog.timeOut).toLocaleString("vi-VN")}
+                   </Descriptions.Item>
+                  )}
+                </Descriptions>
+              </div>
+            )}
+          </Modal>
         </main>
       </div>
     </ConfigProvider>

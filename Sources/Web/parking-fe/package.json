@@ -17,6 +17,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.5",
+    "recharts": "^3.5.1",
     "sockjs-client": "^1.6.1",
     "stompjs": "^2.3.3"
   },
