@@ -5,12 +5,23 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.List;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import com.iot.smartparking.parking_be.dto.MonthlyRevenueDTO; // Add import
+
 public interface ParkingSessionRepository extends JpaRepository<ParkingSession , Integer> {
+
+    @Query("SELECT new com.iot.smartparking.parking_be.dto.MonthlyRevenueDTO(MONTH(p.timeOut), YEAR(p.timeOut), COALESCE(SUM(p.feeCalculated), 0.0)) " +
+            "FROM ParkingSession p " +
+            "WHERE p.card.type = 'DAILY' AND p.status = 'OUT' " +
+            "GROUP BY YEAR(p.timeOut), MONTH(p.timeOut) " +
+            "ORDER BY YEAR(p.timeOut) DESC, MONTH(p.timeOut) DESC")
+    List<MonthlyRevenueDTO> getMonthlyRevenue();
     @Query("SELECT CASE WHEN COUNT(ps) > 0 THEN true ELSE false END " +
             "FROM ParkingSession ps " +
             "WHERE ps.card.id = :cardId AND ps.status = :status")

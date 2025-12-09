@@ -16,4 +16,5 @@ public class CheckOutResponseDTO {
     private String checkInImageUrl;
     private String cardType ;
     private Double feeCalculated;
+    private String registeredLicensePlate;
 }

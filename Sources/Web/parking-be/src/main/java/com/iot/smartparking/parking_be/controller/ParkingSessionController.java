@@ -132,6 +132,16 @@ public class ParkingSessionController {
     }
 
 
+    @GetMapping("/revenue/monthly")
+    public ResponseEntity<ApiResponse<Object>> getMonthlyRevenue() {
+        return ResponseEntity.ok(
+                ApiResponse.builder()
+                        .data(parkingSessionService.getMonthlyRevenue())
+                        .message("Get monthly revenue statistics")
+                        .build()
+        );
+    }
+
     @GetMapping("/overview")
     public Mono<ResponseEntity<ApiResponse<StatisticsResponse>>> getOverview() {
         return parkingSessionService.getOverviewStatistics()
