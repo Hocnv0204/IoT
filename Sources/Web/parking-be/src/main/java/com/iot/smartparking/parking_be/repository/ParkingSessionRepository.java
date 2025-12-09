@@ -20,7 +20,7 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession ,
             "WHERE ps.card.id = :cardId AND ps.status = :status")
     Optional<ParkingSession> findByCardIdAndStatus(@Param("cardId") int cardId, @Param("status") String status);
     @Query("SELECT p FROM ParkingSession p WHERE " +
-            "(:vehicleId) IS NULL OR p.vehicle.id = :vehicleId AND" +
+            "(:vehicleId IS NULL OR p.vehicle.id = :vehicleId) AND " +
             "(:status IS NULL OR p.status = :status) AND " +
             "(:fromDate IS NULL OR p.timeIn >= :fromDate) AND " +
             "(:toDate IS NULL OR p.timeIn <= :toDate)")

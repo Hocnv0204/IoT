@@ -10,6 +10,7 @@ import com.iot.smartparking.parking_be.repository.CustomerRepository;
 import com.iot.smartparking.parking_be.service.CustomerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.iot.smartparking.parking_be.dto.request.UpdateCustomerRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,6 +33,19 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public CustomerDTO updateCustomer(Integer customerId, UpdateCustomerRequest request) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new AppException(ErrorCode.CUSTOMER_NOT_FOUND));
+
+        customer.setFullName(request.getFullName());
+        customer.setPhoneNumber(request.getPhoneNumber());
+        customer.setIdentityCard(request.getIdentityCard());
+
+        Customer updatedCustomer = customerRepository.save(customer);
+        return customerMapper.toDto(updatedCustomer);
+    }
+
+    @Override
     public CustomerDTO getCustomerById(Integer customerId) {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new AppException(ErrorCode.CUSTOMER_NOT_FOUND));
@@ -41,10 +55,17 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public List<CustomerDTO> searchCustomers(String query) {
         if (query == null || query.trim().isEmpty()) {
-            return List.of();
+            return getAllCustomers();
         }
-        List<Customer> customers = customerRepository.findByFullNameContainingIgnoreCaseOrPhoneNumberContaining(query, query);
+        List<Customer> customers = customerRepository.findByFullNameContainingIgnoreCaseOrPhoneNumberContainingOrIdentityCardContaining(query, query, query);
         return customers.stream().map(customerMapper::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CustomerDTO> getAllCustomers() {
+        return customerRepository.findAll().stream()
+                .map(customerMapper::toDto)
+                .collect(Collectors.toList());
     }
 }
 

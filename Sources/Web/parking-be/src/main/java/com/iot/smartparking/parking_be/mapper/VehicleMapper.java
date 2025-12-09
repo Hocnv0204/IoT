@@ -11,6 +11,7 @@ public class VehicleMapper {
                 .id(vehicle.getId())
                 .licensePlate(vehicle.getLicensePlate())
                 .owner(vehicle.getCustomer() != null ? vehicle.getCustomer().getFullName() : null)
+                .customerId(vehicle.getCustomer() != null ? vehicle.getCustomer().getId() : null)
                 .vehicleType(vehicle.getType())
                 .build();
     }
