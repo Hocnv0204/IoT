@@ -45,6 +45,11 @@ export const parkingSessionService = {
     });
     return response.data;
   },
+
+  getMonthlyRevenue: async () => {
+    const response = await apiClient.get("/parking-session/revenue/monthly");
+    return response.data.data;
+  },
 };
 
 export default parkingSessionService;

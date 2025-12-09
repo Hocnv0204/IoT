@@ -215,16 +215,6 @@ export default function MonitoringPage() {
             </div>
           </div>
 
-          {/* Card Scanner */}
-          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center gap-4">
-              <CreditCard className="w-6 h-6 text-blue-400" />
-              <span className="text-white/80">Mã thẻ vừa quét:</span>
-              <div className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xl font-mono text-blue-400">
-                {scannedCardId || <span className="text-white/30">Chờ quẹt thẻ...</span>}
-              </div>
-            </div>
-          </div>
 
           {/* Video Feeds */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -299,12 +289,27 @@ export default function MonitoringPage() {
                 <p className="text-white/60">Không thể check-out vì xe chưa check-in.</p>
               </div>
             ) : currentEvent.status === "DENIED" ? (
-              <div className="text-center py-12">
-                <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
-                  <AlertCircle className="w-10 h-10 text-red-400" />
+              <div className="text-center py-6">
+                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                  <AlertCircle className="w-8 h-8 text-red-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-red-400 mb-2">CẢNH BÁO: BIỂN SỐ KHÔNG KHỚP!</h3>
-                <p className="text-white/60">Hệ thống phát hiện biển số xe ra không khớp với lúc vào.</p>
+                <h3 className="text-xl font-bold text-red-500 mb-2">CẢNH BÁO: BIỂN SỐ KHÔNG KHỚP!</h3>
+                <p className="text-white/60 mb-6">Hệ thống phát hiện biển số xe không khớp với dữ liệu đăng ký.</p>
+                
+                <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto bg-red-500/10 rounded-xl p-4 border border-red-500/20">
+                    <div className="text-center p-3 bg-black/20 rounded-lg">
+                        <div className="text-white/50 text-xs mb-1">Biển số quét được (AI)</div>
+                        <div className="text-amber-400 font-mono font-bold text-xl">{currentEvent.licensePlate || 'Unknown'}</div>
+                    </div>
+                    <div className="text-center p-3 bg-black/20 rounded-lg">
+                        <div className="text-white/50 text-xs mb-1">Biển số đăng ký</div>
+                        <div className="text-emerald-400 font-mono font-bold text-xl">{currentEvent.registeredLicensePlate || 'Unknown'}</div>
+                    </div>
+                    <div className="col-span-2 text-center pt-2 border-t border-red-500/20">
+                        <div className="text-white/50 text-xs mb-1">Chủ xe</div>
+                        <div className="text-white font-medium text-lg">{currentEvent.ownerName || 'Unknown'}</div>
+                    </div>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
