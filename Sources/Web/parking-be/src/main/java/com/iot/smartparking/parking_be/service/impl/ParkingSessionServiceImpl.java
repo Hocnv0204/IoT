@@ -3,12 +3,10 @@ package com.iot.smartparking.parking_be.service.impl;
 import com.iot.smartparking.parking_be.common.CardType;
 import com.iot.smartparking.parking_be.common.CheckStatus;
 import com.iot.smartparking.parking_be.common.ParkStatus;
-import com.iot.smartparking.parking_be.dto.AiResponse;
-import com.iot.smartparking.parking_be.dto.response.CheckInResponseDTO;
-import com.iot.smartparking.parking_be.dto.PageResponse;
-import com.iot.smartparking.parking_be.dto.ParkingSessionDTO;
+import com.iot.smartparking.parking_be.dto.*;
 import com.iot.smartparking.parking_be.dto.request.admin.LogRequest;
 import com.iot.smartparking.parking_be.dto.request.user.CheckRequest;
+import com.iot.smartparking.parking_be.dto.response.CheckInResponseDTO;
 import com.iot.smartparking.parking_be.dto.response.CheckOutResponseDTO;
 import com.iot.smartparking.parking_be.dto.response.ErrorNotificationDTO;
 import com.iot.smartparking.parking_be.dto.response.StatisticsResponse;
@@ -41,6 +39,7 @@ import reactor.core.scheduler.Schedulers;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -62,6 +61,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Vehicle vehicle ;
         boolean dailyTicket;
     }
+
+    @Override
+    public List<MonthlyRevenueDTO> getMonthlyRevenue() {
+        return parkingSessionRepository.getMonthlyRevenue();
+    }
+
     @Transactional
     @Override
     public Mono<CheckInResponseDTO> checkIn(CheckRequest request , MultipartFile image ){
@@ -134,7 +139,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                                 .licensePlate(detectedPlate)
                                 .checkInAt(LocalDateTime.now())
                                 .status(CheckStatus.DENIED.name())
-                                .ownerName("Unknown") // Thêm trường này để tránh null pointer ở FE
+                                .ownerName(vehicle.getCustomer().getFullName())
+                                .registeredLicensePlate(vehicle.getLicensePlate())
+                                .cardType(card.getType())
                                 .build());
                     }
 
@@ -382,11 +389,20 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                         log.info("Session Plate: {} - AI Plate: {}", expectedPlate, detectedPlate);
 
                         if (!isPlateMatching(expectedPlate, detectedPlate)) {
+                            String ownerNameResp = "Unknown" ;
+                            String registeredPlate = expectedPlate;
+
+                            if(!isDaily && vehicle != null){
+                                ownerNameResp = vehicle.getCustomer().getFullName();
+                                registeredPlate = vehicle.getLicensePlate();
+                            }
+
                             return CheckOutResponseDTO.builder()
                                     .licensePlate(detectedPlate)
                                     .checkOutAt(now)
                                     .status(CheckStatus.DENIED.name())
-                                    .ownerName("Unknown")
+                                    .ownerName(ownerNameResp)
+                                    .registeredLicensePlate(registeredPlate)
                                     .cardType(card.getType())
                                     .imageUrl(imageUrl)
                                     .build();
@@ -427,4 +443,3 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
 }
-
